@@ -3,7 +3,7 @@ import * as THREE from 'three';
 
 const GameScene = () => {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const initialized = useRef(false); // ✅ FIX duplicate scene
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (!mountRef.current || initialized.current) return;
@@ -17,6 +17,7 @@ const GameScene = () => {
     const acceleration = 0.02;
     const friction = 0.01;
 
+    let moveForward = false; // ✅ FIX
     let moveLeft = false;
     let moveRight = false;
 
@@ -70,15 +71,16 @@ const GameScene = () => {
     const cameraOffset = new THREE.Vector3(0, 5, 10);
 
     // ===============================
-    // 🎮 Controls
+    // 🎮 Controls (FIXED)
     // ===============================
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp') speed += acceleration;
+      if (e.key === 'ArrowUp') moveForward = true;
       if (e.key === 'ArrowLeft') moveLeft = true;
       if (e.key === 'ArrowRight') moveRight = true;
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') moveForward = false;
       if (e.key === 'ArrowLeft') moveLeft = false;
       if (e.key === 'ArrowRight') moveRight = false;
     };
@@ -91,13 +93,13 @@ const GameScene = () => {
     // ===============================
     const handleResize = () => {
       if (!mountRef.current) return;
-      camera.aspect =
-        mountRef.current.clientWidth / mountRef.current.clientHeight;
+
+      const width = mountRef.current.clientWidth;
+      const height = mountRef.current.clientHeight;
+
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(
-        mountRef.current.clientWidth,
-        mountRef.current.clientHeight
-      );
+      renderer.setSize(width, height);
     };
 
     window.addEventListener('resize', handleResize);
@@ -110,15 +112,20 @@ const GameScene = () => {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      // 🚗 Speed physics
-      if (speed > 0) speed -= friction;
-      if (speed < 0) speed = 0;
-      speed = Math.min(speed, maxSpeed);
+      // 🚗 Acceleration
+      if (moveForward) {
+        speed += acceleration;
+      } else {
+        speed -= friction;
+      }
+
+      // Clamp speed
+      speed = Math.max(0, Math.min(speed, maxSpeed));
 
       // 🛣️ Move road
       road.position.z += speed;
 
-      // 🚗 Turning
+      // 🚗 Turning (depends on speed)
       const turnSpeed = speed * 2;
       if (moveLeft) car.position.x -= turnSpeed;
       if (moveRight) car.position.x += turnSpeed;
@@ -151,7 +158,7 @@ const GameScene = () => {
         mountRef.current.removeChild(renderer.domElement);
       }
 
-      initialized.current = false; // reset if component unmounts
+      initialized.current = false;
     };
   }, []);
 
