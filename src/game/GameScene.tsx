@@ -54,7 +54,7 @@ const GameScene = () => {
     scene.add(road);
 
     // ===============================
-    // 🚗 Car (Cube for now)
+    // 🚗 Car
     // ===============================
     const carGeometry = new THREE.BoxGeometry(1, 1, 2);
     const carMaterial = new THREE.MeshStandardMaterial({
@@ -63,6 +63,11 @@ const GameScene = () => {
     const car = new THREE.Mesh(carGeometry, carMaterial);
     car.position.y = 0.5;
     scene.add(car);
+
+    // ===============================
+    // 🎥 Camera Offset (FIXED POSITION)
+    // ===============================
+    const cameraOffset = new THREE.Vector3(0, 5, 10);
 
     // ===============================
     // 🎮 Controls
@@ -82,7 +87,7 @@ const GameScene = () => {
     window.addEventListener('keyup', handleKeyUp);
 
     // ===============================
-    // 📱 Handle Resize
+    // 📱 Resize Handling
     // ===============================
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -100,22 +105,25 @@ const GameScene = () => {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      // Apply friction
+      // 🚗 Speed physics
       if (speed > 0) speed -= friction;
       if (speed < 0) speed = 0;
-
-      // Limit speed
       speed = Math.min(speed, maxSpeed);
 
-      // Move road (simulate forward motion)
+      // 🛣️ Move road
       road.position.z += speed;
 
-      // Smooth turning
-      if (moveLeft) car.position.x -= 0.1;
-      if (moveRight) car.position.x += 0.1;
+      // 🚗 Turning
+      const turnSpeed = speed * 2;
+      if (moveLeft) car.position.x -= turnSpeed;
+      if (moveRight) car.position.x += turnSpeed;
 
-      // Keep car inside road
       car.position.x = Math.max(-4, Math.min(4, car.position.x));
+
+      // 🎥 Camera Follow (CLEAN)
+      const targetPosition = car.position.clone().add(cameraOffset);
+      camera.position.lerp(targetPosition, 0.1);
+      camera.lookAt(car.position);
 
       renderer.render(scene, camera);
     };
