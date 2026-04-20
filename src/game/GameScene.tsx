@@ -3,9 +3,11 @@ import * as THREE from 'three';
 
 const GameScene = () => {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const initialized = useRef(false); // ✅ FIX duplicate scene
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!mountRef.current || initialized.current) return;
+    initialized.current = true;
 
     // ===============================
     // 🚗 Movement Variables
@@ -45,27 +47,25 @@ const GameScene = () => {
     // ===============================
     // 🛣️ Road
     // ===============================
-    const roadGeometry = new THREE.PlaneGeometry(10, 50);
-    const roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-    });
-    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+    const road = new THREE.Mesh(
+      new THREE.PlaneGeometry(10, 50),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
     road.rotation.x = -Math.PI / 2;
     scene.add(road);
 
     // ===============================
     // 🚗 Car
     // ===============================
-    const carGeometry = new THREE.BoxGeometry(1, 1, 2);
-    const carMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff0000,
-    });
-    const car = new THREE.Mesh(carGeometry, carMaterial);
+    const car = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 2),
+      new THREE.MeshStandardMaterial({ color: 0xff0000 })
+    );
     car.position.y = 0.5;
     scene.add(car);
 
     // ===============================
-    // 🎥 Camera Offset (FIXED POSITION)
+    // 🎥 Camera Offset
     // ===============================
     const cameraOffset = new THREE.Vector3(0, 5, 10);
 
@@ -90,9 +90,14 @@ const GameScene = () => {
     // 📱 Resize Handling
     // ===============================
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      if (!mountRef.current) return;
+      camera.aspect =
+        mountRef.current.clientWidth / mountRef.current.clientHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(
+        mountRef.current.clientWidth,
+        mountRef.current.clientHeight
+      );
     };
 
     window.addEventListener('resize', handleResize);
@@ -120,7 +125,7 @@ const GameScene = () => {
 
       car.position.x = Math.max(-4, Math.min(4, car.position.x));
 
-      // 🎥 Camera Follow (CLEAN)
+      // 🎥 Camera Follow
       const targetPosition = car.position.clone().add(cameraOffset);
       camera.position.lerp(targetPosition, 0.1);
       camera.lookAt(car.position);
@@ -145,10 +150,17 @@ const GameScene = () => {
       if (mountRef.current?.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);
       }
+
+      initialized.current = false; // reset if component unmounts
     };
   }, []);
 
-  return <div ref={mountRef} />;
+  return (
+    <div
+      ref={mountRef}
+      style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}
+    />
+  );
 };
 
 export default GameScene;
