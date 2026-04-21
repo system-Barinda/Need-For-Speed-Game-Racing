@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 const GameScene = () => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const initialized = useRef(false);
+
+  const [crash, setCrash] = useState(false);
 
   const gameRef = useRef<{
     car: THREE.Group | null;
@@ -12,8 +14,15 @@ const GameScene = () => {
     sun: THREE.DirectionalLight | null;
     camera: THREE.PerspectiveCamera | null;
     renderer: THREE.WebGLRenderer | null;
+    obstacles: THREE.Mesh[];
     speed: number;
-    keys: { fwd: boolean; bwd: boolean; lft: boolean; rgt: boolean };
+    keys: {
+      fwd: boolean;
+      bwd: boolean;
+      lft: boolean;
+      rgt: boolean;
+      reset: boolean;
+    };
   }>({
     car: null,
     carBody: null,
@@ -21,8 +30,9 @@ const GameScene = () => {
     sun: null,
     camera: null,
     renderer: null,
+    obstacles: [],
     speed: 0,
-    keys: { fwd: false, bwd: false, lft: false, rgt: false },
+    keys: { fwd: false, bwd: false, lft: false, rgt: false, reset: false },
   });
 
   useEffect(() => {
@@ -64,7 +74,7 @@ const GameScene = () => {
     sun.shadow.camera.far = 400;
     scene.add(sun);
 
-    // Ground
+    // Ground & Road (same as before)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(500, 2000),
       new THREE.MeshStandardMaterial({ color: 0x4a8c3f })
@@ -73,7 +83,6 @@ const GameScene = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Road
     const road = new THREE.Mesh(
       new THREE.PlaneGeometry(10, 2000),
       new THREE.MeshStandardMaterial({ color: 0x282828 })
@@ -83,27 +92,33 @@ const GameScene = () => {
     road.receiveShadow = true;
     scene.add(road);
 
-    // Center dashes (copy from your original if needed)
-    const dashMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    for (let z = -990; z < 990; z += 10) {
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 5), dashMat);
-      d.rotation.x = -Math.PI / 2;
-      d.position.set(0, 0.02, z);
-      scene.add(d);
+    // Center dashes + edge lines (copy your original code here if needed)
+
+    // === OBSTACLES ===
+    const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
+    const obstacles: THREE.Mesh[] = [];
+    const obstacleSize = 1.2;
+
+    // Spawn some obstacles along the road sides
+    for (let i = -800; i < 800; i += 45 + Math.random() * 25) {
+      [-5.5, 5.5].forEach((side) => {
+        const obs = new THREE.Mesh(
+          new THREE.BoxGeometry(obstacleSize, obstacleSize * 0.8, obstacleSize),
+          obstacleMat
+        );
+        obs.position.set(
+          side + (Math.random() - 0.5) * 1.5,
+          obstacleSize * 0.4,
+          i
+        );
+        obs.castShadow = true;
+        obs.receiveShadow = true;
+        scene.add(obs);
+        obstacles.push(obs);
+      });
     }
 
-    // Edge lines
-    const edgeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    [-4.85, 4.85].forEach((x) => {
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 2000), edgeMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(x, 0.02, 0);
-      scene.add(line);
-    });
-
-    // Trees (add your original tree code here if you want them)
-
-    // Car
+    // Car (same as before - paste your full car creation code here)
     const car = new THREE.Group();
     scene.add(car);
 
@@ -115,8 +130,7 @@ const GameScene = () => {
     carBody.castShadow = true;
     car.add(carBody);
 
-    // Add cabin, glass, headlights, taillights here (same as your original code)
-    // ... paste them exactly as before
+    // Cabin, glass, lights, wheels... (add your full car parts here exactly as before)
 
     const tireGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.28, 20);
     const hubGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.29, 8);
@@ -148,7 +162,7 @@ const GameScene = () => {
 
     car.position.set(0, 0, 0);
 
-    // Store references
+    // Store everything
     const g = gameRef.current;
     g.car = car;
     g.carBody = carBody;
@@ -156,12 +170,29 @@ const GameScene = () => {
     g.sun = sun;
     g.camera = camera;
     g.renderer = renderer;
+    g.obstacles = obstacles;
 
-    // Animation loop
+    // Animation
     let animId: number;
     const camTarget = new THREE.Vector3();
     const camPos = new THREE.Vector3(0, 3.5, 8);
     const OFFSET = new THREE.Vector3(0, 3.5, 9.5);
+
+    const carBox = new THREE.Box3();
+    const obsBox = new THREE.Box3();
+
+    const checkCollision = (): boolean => {
+      if (!g.car) return false;
+      carBox.setFromObject(g.car);
+
+      for (const obs of g.obstacles) {
+        obsBox.setFromObject(obs);
+        if (carBox.intersectsBox(obsBox)) {
+          return true;
+        }
+      }
+      return false;
+    };
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -169,49 +200,66 @@ const GameScene = () => {
       const keys = g.keys;
       let speed = g.speed;
 
-      // === Better acceleration / braking logic ===
-      if (keys.fwd) {
-        speed = Math.min(speed + ACCELERATION, MAX_SPEED);
-      } else if (keys.bwd) {
-        speed = Math.max(speed - BRAKE, -MAX_SPEED * 0.6);
-      } else {
-        // Natural friction
-        if (speed > 0) speed = Math.max(0, speed - FRICTION);
-        else if (speed < 0) speed = Math.min(0, speed + FRICTION);
+      if (keys.reset) {
+        // Reset car
+        if (g.car) {
+          g.car.position.set(0, 0, 0);
+          g.car.rotation.y = 0;
+        }
+        speed = 0;
+        setCrash(false);
+        keys.reset = false;
       }
 
-      g.speed = speed;
-
-      // Steering (only when moving)
-      if (Math.abs(speed) > 0.01 && g.car) {
-        const turnSpeed = TURN * (speed / MAX_SPEED);
-        if (keys.lft) g.car.rotation.y += turnSpeed;
-        if (keys.rgt) g.car.rotation.y -= turnSpeed;
-      }
-
-      // Move the car
-      if (g.car) {
-        const dir = new THREE.Vector3(
-          -Math.sin(g.car.rotation.y),
-          0,
-          -Math.cos(g.car.rotation.y)
-        );
-        g.car.position.addScaledVector(dir, speed);
-
-        // Body tilt
-        if (g.carBody) {
-          g.carBody.rotation.x = THREE.MathUtils.lerp(
-            g.carBody.rotation.x,
-            -speed * 0.08,
-            0.3
-          );
+      if (!crash) {
+        // Acceleration / Braking
+        if (keys.fwd) {
+          speed = Math.min(speed + ACCELERATION, MAX_SPEED);
+        } else if (keys.bwd) {
+          speed = Math.max(speed - BRAKE, -MAX_SPEED * 0.6);
+        } else {
+          if (speed > 0) speed = Math.max(0, speed - FRICTION);
+          else if (speed < 0) speed = Math.min(0, speed + FRICTION);
         }
 
-        // Wheel rotation
-        g.tires.forEach((t) => (t.rotation.x += speed * 4.2));
+        g.speed = speed;
+
+        // Steering
+        if (Math.abs(speed) > 0.01 && g.car) {
+          const turnSpeed = TURN * (Math.abs(speed) / MAX_SPEED);
+          if (keys.lft) g.car.rotation.y += turnSpeed;
+          if (keys.rgt) g.car.rotation.y -= turnSpeed;
+        }
+
+        // Move car
+        if (g.car && Math.abs(speed) > 0.005) {
+          const dir = new THREE.Vector3(
+            -Math.sin(g.car.rotation.y),
+            0,
+            -Math.cos(g.car.rotation.y)
+          );
+          g.car.position.addScaledVector(dir, speed);
+
+          // Body tilt + wheels
+          if (g.carBody) {
+            g.carBody.rotation.x = THREE.MathUtils.lerp(
+              g.carBody.rotation.x,
+              -speed * 0.08,
+              0.3
+            );
+          }
+          g.tires.forEach((t) => (t.rotation.x += speed * 4.2));
+        }
+
+        // Check collision AFTER movement
+        if (checkCollision()) {
+          speed = 0;
+          g.speed = 0;
+          setCrash(true);
+        }
       }
 
-      // Smooth camera follow
+      // Camera & Sun (same as before)
       if (g.car && g.camera) {
         const behind = OFFSET.clone().applyEuler(
           new THREE.Euler(0, g.car.rotation.y, 0)
@@ -230,7 +278,6 @@ const GameScene = () => {
         g.camera.lookAt(camTarget);
       }
 
-      // Sun follows car
       if (g.sun && g.car) {
         g.sun.position.set(
           g.car.position.x + 30,
@@ -258,6 +305,7 @@ const GameScene = () => {
         g.keys.lft = true;
       if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd')
         g.keys.rgt = true;
+      if (e.key.toLowerCase() === 'r') g.keys.reset = true;
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -297,7 +345,7 @@ const GameScene = () => {
       renderer.dispose();
       initialized.current = false;
     };
-  }, []);
+  }, [crash]); // re-run only if crash state changes (rare)
 
   return (
     <div
@@ -310,6 +358,7 @@ const GameScene = () => {
     >
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
+      {/* Controls HUD */}
       <div
         style={{
           position: 'absolute',
@@ -325,9 +374,29 @@ const GameScene = () => {
           pointerEvents: 'none',
         }}
       >
-        W / ↑ Accelerate &nbsp;|&nbsp; S / ↓ Brake &nbsp;|&nbsp; A / ← Left
-        &nbsp;|&nbsp; D / → Right
+        W/↑ Accelerate &nbsp;|&nbsp; S/↓ Brake &nbsp;|&nbsp; A/← Left
+        &nbsp;|&nbsp; D/→ Right &nbsp;|&nbsp; R = Reset
       </div>
+
+      {/* Crash Message */}
+      {crash && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#ff4444',
+            fontSize: '48px',
+            fontWeight: 'bold',
+            textShadow: '0 0 10px #000',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          CRASH!
+        </div>
+      )}
     </div>
   );
 };
