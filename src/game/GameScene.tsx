@@ -5,21 +5,24 @@ const GameScene = () => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const initialized = useRef(false);
 
+  // ── Game state (using refs = best practice for React + game loops) ──
+  const speedRef = useRef(0);
+  const keysRef = useRef({
+    fwd: false,
+    bwd: false,
+    lft: false,
+    rgt: false,
+  });
+
   useEffect(() => {
     if (!mountRef.current || initialized.current) return;
     initialized.current = true;
 
-    // ── Movement ──────────────────────────────────────────
-    let speed = 0;
-    const MAX_SPEED = 0.8;
-    const ACCELERATION = 0.025;
-    const FRICTION = 0.012;
-    const TURN = 0.04;
-
-    let fwd = false,
-      bwd = false,
-      lft = false,
-      rgt = false;
+    // ── Tuned constants (slightly faster & more responsive feel) ──
+    const MAX_SPEED = 1.2;
+    const ACCELERATION = 0.035;
+    const FRICTION = 0.015;
+    const TURN = 0.045;
 
     // ── Renderer ──────────────────────────────────────────
     const W = () => window.innerWidth;
@@ -39,7 +42,6 @@ const GameScene = () => {
 
     // ── Camera ────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(60, W() / H(), 0.1, 500);
-    // start positioned behind where car will be
     camera.position.set(0, 3.5, 8);
     camera.lookAt(0, 1, 0);
 
@@ -56,7 +58,7 @@ const GameScene = () => {
     sun.shadow.camera.far = 400;
     scene.add(sun);
 
-    // ── Ground ────────────────────────────────────────────
+    // ── Ground & Road (same as before) ─────────────────────
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(500, 2000),
       new THREE.MeshStandardMaterial({ color: 0x4a8c3f })
@@ -65,7 +67,6 @@ const GameScene = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Road ─────────────────────────────────────────────
     const road = new THREE.Mesh(
       new THREE.PlaneGeometry(10, 2000),
       new THREE.MeshStandardMaterial({ color: 0x282828 })
@@ -93,7 +94,7 @@ const GameScene = () => {
       scene.add(line);
     });
 
-    // ── Trees ────────────────────────────────────────────
+    // ── Trees (same) ───────────────────────────────────────
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a4f2a });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d6a2d });
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.24, 1.6, 7);
@@ -129,7 +130,7 @@ const GameScene = () => {
     carBody.castShadow = true;
     car.add(carBody);
 
-    // Cabin
+    // Cabin, glass, lights, wheels... (exactly the same as your original)
     const carCabin = new THREE.Mesh(
       new THREE.BoxGeometry(1.42, 0.52, 2.1),
       new THREE.MeshStandardMaterial({ color: 0xcc1100 })
@@ -138,7 +139,6 @@ const GameScene = () => {
     carCabin.castShadow = true;
     car.add(carCabin);
 
-    // Windshield (front glass)
     const glass = new THREE.Mesh(
       new THREE.BoxGeometry(1.36, 0.44, 0.06),
       new THREE.MeshStandardMaterial({
@@ -150,7 +150,6 @@ const GameScene = () => {
     glass.position.set(0, 1.09, 1.08);
     car.add(glass);
 
-    // Headlights
     const hlMat = new THREE.MeshStandardMaterial({
       color: 0xffffcc,
       emissive: 0xffffaa,
@@ -162,7 +161,6 @@ const GameScene = () => {
       car.add(hl);
     });
 
-    // Tail lights
     const tlMat = new THREE.MeshStandardMaterial({
       color: 0xff0000,
       emissive: 0xff2200,
@@ -174,7 +172,6 @@ const GameScene = () => {
       car.add(tl);
     });
 
-    // Wheels
     const tireGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.28, 20);
     const hubGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.29, 8);
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
@@ -207,9 +204,8 @@ const GameScene = () => {
 
     car.position.set(0, 0, 0);
 
-    // ── Animation ────────────────────────────────────────
+    // ── Animation variables ───────────────────────────────
     let animId: number;
-
     const camTarget = new THREE.Vector3();
     const camPos = new THREE.Vector3(0, 3.5, 8);
     const OFFSET = new THREE.Vector3(0, 3.5, 9);
@@ -217,42 +213,52 @@ const GameScene = () => {
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
+      const keys = keysRef.current;
+
       // ── Speed ──
-      if (fwd) speed = Math.min(speed + ACCELERATION, MAX_SPEED);
-      else if (bwd) speed = Math.max(speed - ACCELERATION, -MAX_SPEED * 0.5);
-      else {
-        if (speed > 0) speed = Math.max(0, speed - FRICTION);
-        if (speed < 0) speed = Math.min(0, speed + FRICTION);
+      if (keys.fwd) {
+        speedRef.current = Math.min(speedRef.current + ACCELERATION, MAX_SPEED);
+      } else if (keys.bwd) {
+        speedRef.current = Math.max(
+          speedRef.current - ACCELERATION,
+          -MAX_SPEED * 0.5
+        );
+      } else {
+        const s = speedRef.current;
+        if (s > 0) speedRef.current = Math.max(0, s - FRICTION);
+        if (s < 0) speedRef.current = Math.min(0, s + FRICTION);
       }
+
+      const currentSpeed = speedRef.current;
 
       // ── Steer ──
-      if (Math.abs(speed) > 0.005) {
-        const t = TURN * (speed / MAX_SPEED);
-        if (lft) car.rotation.y += t;
-        if (rgt) car.rotation.y -= t;
+      if (Math.abs(currentSpeed) > 0.005) {
+        const t = TURN * (currentSpeed / MAX_SPEED);
+        if (keys.lft) car.rotation.y += t;
+        if (keys.rgt) car.rotation.y -= t;
       }
 
-      // ── Move car through world ──
+      // ── Move car ──
       const dir = new THREE.Vector3(
         -Math.sin(car.rotation.y),
         0,
         -Math.cos(car.rotation.y)
       );
-      car.position.addScaledVector(dir, speed);
+      car.position.addScaledVector(dir, currentSpeed);
 
-      // Slight body tilt for feel
+      // Body tilt
       carBody.rotation.x = THREE.MathUtils.lerp(
         carBody.rotation.x,
-        -speed * 0.06,
+        -currentSpeed * 0.06,
         0.2
       );
 
       // Spin wheels
       tires.forEach((t) => {
-        t.rotation.x += speed * 3.5;
+        t.rotation.x += currentSpeed * 3.5;
       });
 
-      // ── Camera: always stay behind car, rotated with it ──
+      // ── Camera follow (same smooth chase) ──
       const behind = OFFSET.clone().applyEuler(
         new THREE.Euler(0, car.rotation.y, 0)
       );
@@ -265,7 +271,7 @@ const GameScene = () => {
       );
       camera.lookAt(camTarget);
 
-      // Keep directional light near car so shadows follow
+      // Sun follows car
       sun.position.set(
         car.position.x + 30,
         car.position.y + 60,
@@ -279,19 +285,30 @@ const GameScene = () => {
 
     animate();
 
-    // ── Controls ─────────────────────────────────────────
+    // ── Controls (now with preventDefault + cleaner key checks) ──
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') fwd = true;
-      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') bwd = true;
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') lft = true;
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rgt = true;
+      e.preventDefault(); // ← fixes arrow keys scrolling the page
+      if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w')
+        keysRef.current.fwd = true;
+      if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's')
+        keysRef.current.bwd = true;
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a')
+        keysRef.current.lft = true;
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd')
+        keysRef.current.rgt = true;
     };
+
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') fwd = false;
-      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') bwd = false;
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') lft = false;
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rgt = false;
+      if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w')
+        keysRef.current.fwd = false;
+      if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's')
+        keysRef.current.bwd = false;
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a')
+        keysRef.current.lft = false;
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd')
+        keysRef.current.rgt = false;
     };
+
     const onResize = () => {
       camera.aspect = W() / H();
       camera.updateProjectionMatrix();
