@@ -21,7 +21,7 @@ export const buildRoads = (scene: THREE.Scene) => {
 
   const mainCurve = new THREE.CatmullRomCurve3(mainPoints);
 
-  // ── ALTERNATIVE CURVE (SECOND ROUTE) ─
+  // ── ALTERNATIVE CURVE ────────────────
   const altPoints = [
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(-10, 0, -60),
@@ -33,7 +33,7 @@ export const buildRoads = (scene: THREE.Scene) => {
 
   const altCurve = new THREE.CatmullRomCurve3(altPoints);
 
-  // ── FUNCTION TO BUILD ROAD FROM CURVE ─
+  // ── FUNCTION TO BUILD ROAD ───────────
   const createRoadFromCurve = (curve: THREE.CatmullRomCurve3) => {
     const geometry = new THREE.BufferGeometry();
     const vertices: number[] = [];
@@ -94,11 +94,11 @@ export const buildRoads = (scene: THREE.Scene) => {
     }
   };
 
-  // ── BUILD BOTH ROADS ─────────────────
+  // ── BUILD ROADS ──────────────────────
   createRoadFromCurve(mainCurve);
   createRoadFromCurve(altCurve);
 
-  // ── OBSTACLES (ONLY MAIN ROAD) ───────
+  // ── OBSTACLES (MAIN ROAD) ────────────
   for (let i = 10; i < SEGMENTS; i += 20) {
     const t = i / SEGMENTS;
     const point = mainCurve.getPoint(t);
@@ -109,12 +109,11 @@ export const buildRoads = (scene: THREE.Scene) => {
     );
 
     box.position.set(point.x, 0.5, point.z);
-
     scene.add(box);
     obstacles.push(box);
   }
 
-  // ── 🌳 TREES ─────────────────────────
+  // ── TREES ────────────────────────────
   const treeMat = new THREE.MeshStandardMaterial({ color: 0x228833 });
 
   for (let i = 0; i < 120; i++) {
@@ -137,7 +136,7 @@ export const buildRoads = (scene: THREE.Scene) => {
     scene.add(tree);
   }
 
-  // ── ⛰️ MOUNTAINS ─────────────────────
+  // ── MOUNTAINS ────────────────────────
   const mountainMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
 
   for (let i = 0; i < 40; i++) {
@@ -155,10 +154,10 @@ export const buildRoads = (scene: THREE.Scene) => {
     scene.add(mountain);
   }
 
-  // ── RETURN EVERYTHING ────────────────
+  // ✅ FIXED RETURN
   return {
     obstacles,
-    curve: mainCurve,
-    altCurve: altCurve,
+    curve: mainCurve,   // main road for car
+    altCurve: altCurve, // optional second route
   };
 };
