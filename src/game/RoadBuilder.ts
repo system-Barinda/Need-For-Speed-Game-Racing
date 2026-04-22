@@ -2,12 +2,12 @@ import * as THREE from 'three';
 
 export const buildRoads = (scene: THREE.Scene) => {
   const obstacles: THREE.Mesh[] = [];
-  const trafficCars: THREE.Mesh[] = [];
+  const trafficCars: any[] = []; // store AI data
 
   // ── SETTINGS ─────────────────────────
   const LANE_WIDTH = 3;
   const LANES = 3;
-  const ROAD_WIDTH = LANE_WIDTH * LANES; // 9
+  const ROAD_WIDTH = LANE_WIDTH * LANES;
   const SEGMENTS = 300;
 
   // ── MAIN CURVE ───────────────────────
@@ -34,15 +34,10 @@ export const buildRoads = (scene: THREE.Scene) => {
 
     const point = curve.getPoint(t);
     const tangent = curve.getTangent(t);
-
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-    const left = point
-      .clone()
-      .add(normal.clone().multiplyScalar(ROAD_WIDTH / 2));
-    const right = point
-      .clone()
-      .add(normal.clone().multiplyScalar(-ROAD_WIDTH / 2));
+    const left = point.clone().add(normal.clone().multiplyScalar(ROAD_WIDTH / 2));
+    const right = point.clone().add(normal.clone().multiplyScalar(-ROAD_WIDTH / 2));
 
     vertices.push(left.x, left.y, left.z);
     vertices.push(right.x, right.y, right.z);
@@ -63,10 +58,7 @@ export const buildRoads = (scene: THREE.Scene) => {
 
   const road = new THREE.Mesh(
     geometry,
-    new THREE.MeshStandardMaterial({
-      color: 0x2a2a2a,
-      side: THREE.DoubleSide,
-    })
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
   );
 
   scene.add(road);
@@ -82,15 +74,11 @@ export const buildRoads = (scene: THREE.Scene) => {
 
       const point = curve.getPoint(t);
       const tangent = curve.getTangent(t);
-
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-      const lanePos = point
-        .clone()
-        .add(normal.clone().multiplyScalar(laneOffset));
+      const lanePos = point.clone().add(normal.clone().multiplyScalar(laneOffset));
 
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 2), dashMat);
-
       dash.rotation.x = -Math.PI / 2;
       dash.position.copy(lanePos);
       dash.position.y = 0.05;
@@ -99,69 +87,33 @@ export const buildRoads = (scene: THREE.Scene) => {
     }
   }
 
-  // ── ROAD BORDERS ─────────────────────
-  const borderMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-
-  for (let i = 0; i < SEGMENTS; i += 2) {
-    const t = i / SEGMENTS;
-
-    const point = curve.getPoint(t);
-    const tangent = curve.getTangent(t);
-
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
-    const left = point
-      .clone()
-      .add(normal.clone().multiplyScalar(ROAD_WIDTH / 2));
-    const right = point
-      .clone()
-      .add(normal.clone().multiplyScalar(-ROAD_WIDTH / 2));
-
-    [left, right].forEach((pos) => {
-      const border = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 2),
-        borderMat
-      );
-
-      border.position.copy(pos);
-      border.position.y = 0.1;
-
-      scene.add(border);
-    });
-  }
-
-  // ── TRAFFIC (AI CARS FOR OVERTAKING) ─
+  // ── AI TRAFFIC SYSTEM 🚗 ─────────────
   const trafficMat = new THREE.MeshStandardMaterial({ color: 0x00aaff });
 
-  for (let i = 20; i < SEGMENTS; i += 30) {
+  for (let i = 20; i < SEGMENTS; i += 25) {
     const t = i / SEGMENTS;
 
-    const point = curve.getPoint(t);
-    const tangent = curve.getTangent(t);
-
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
-    // random lane
     const laneIndex = Math.floor(Math.random() * LANES);
-    const laneOffset =
-      -ROAD_WIDTH / 2 + laneIndex * LANE_WIDTH + LANE_WIDTH / 2;
 
-    const pos = point.clone().add(normal.multiplyScalar(laneOffset));
+    const carMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.7, 3),
+      trafficMat
+    );
 
-    const car = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 3), trafficMat);
+    scene.add(carMesh);
 
-    car.position.copy(pos);
-    car.position.y = 0.4;
+    trafficCars.push({
+      mesh: carMesh,
+      t,
+      speed: 0.0005 + Math.random() * 0.0007,
+      lane: laneIndex,
+      targetLane: laneIndex,
+    });
 
-    // rotate with road
-    car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
-
-    scene.add(car);
-    trafficCars.push(car);
-    obstacles.push(car); // 👈 collision
+    obstacles.push(carMesh);
   }
 
-  // ── TREES ────────────────────────────
+  // ── 🌳 TREES ─────────────────────────
   const treeMat = new THREE.MeshStandardMaterial({ color: 0x228833 });
 
   for (let i = 0; i < 150; i++) {
@@ -170,10 +122,12 @@ export const buildRoads = (scene: THREE.Scene) => {
     const tangent = curve.getTangent(t);
 
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
     const offset = (Math.random() > 0.5 ? 1 : -1) * (12 + Math.random() * 20);
 
-    const tree = new THREE.Mesh(new THREE.ConeGeometry(1.5, 4, 8), treeMat);
+    const tree = new THREE.Mesh(
+      new THREE.ConeGeometry(1.5, 4, 8),
+      treeMat
+    );
 
     tree.position.copy(point.clone().add(normal.multiplyScalar(offset)));
     tree.position.y = 2;
@@ -181,7 +135,7 @@ export const buildRoads = (scene: THREE.Scene) => {
     scene.add(tree);
   }
 
-  // ── MOUNTAINS ────────────────────────
+  // ── ⛰️ MOUNTAINS ─────────────────────
   const mountainMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
 
   for (let i = 0; i < 50; i++) {
@@ -199,10 +153,31 @@ export const buildRoads = (scene: THREE.Scene) => {
     scene.add(mountain);
   }
 
+  // ── 🏠 HOUSES (SIDE AREA) ────────────
+  const houseMat = new THREE.MeshStandardMaterial({ color: 0x884422 });
+
+  for (let i = 0; i < 30; i++) {
+    const house = new THREE.Mesh(
+      new THREE.BoxGeometry(5, 4, 5),
+      houseMat
+    );
+
+    house.position.set(
+      (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 50),
+      2,
+      -Math.random() * 700
+    );
+
+    scene.add(house);
+  }
+
   // ── RETURN ───────────────────────────
   return {
     obstacles,
     curve,
-    trafficCars, // 👈 for future AI movement
+    trafficCars,
+    LANES,
+    LANE_WIDTH,
+    ROAD_WIDTH,
   };
 };

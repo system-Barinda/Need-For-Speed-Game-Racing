@@ -30,7 +30,7 @@ export const initThreeGame = ({
   renderer.shadowMap.enabled = true;
   mount.appendChild(renderer.domElement);
 
-  // 👉 IMPORTANT: focus canvas (keyboard fix)
+  // 👉 keyboard focus
   renderer.domElement.setAttribute('tabindex', '0');
   renderer.domElement.focus();
 
@@ -42,8 +42,15 @@ export const initThreeGame = ({
   sun.castShadow = true;
   scene.add(sun);
 
-  // ── World ─────────────────────────────
-  const { obstacles, curve } = buildRoads(scene);
+  // ── World (🔥 IMPORTANT UPDATE) ───────
+  const {
+    obstacles,
+    curve,
+    trafficCars,
+    LANES,
+    LANE_WIDTH,
+    ROAD_WIDTH,
+  } = buildRoads(scene);
 
   // ── Car ───────────────────────────────
   const { car, carBody, tires } = createCar(scene);
@@ -67,14 +74,11 @@ export const initThreeGame = ({
     reset: false,
   };
 
-  // ── Controls (🔥 FIXED) ───────────────
+  // ── Controls ──────────────────────────
   const onKeyDown = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
 
-    // 👉 STOP browser scrolling
-    if (
-      ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)
-    ) {
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
       e.preventDefault();
     }
 
@@ -96,7 +100,6 @@ export const initThreeGame = ({
     if (k === 'd' || k === 'arrowright') keys.rgt = false;
   };
 
-  // 👉 Attach to window (global capture)
   window.addEventListener('keydown', onKeyDown, { passive: false });
   window.addEventListener('keyup', onKeyUp);
 
@@ -127,29 +130,27 @@ export const initThreeGame = ({
       if (speed < 0) speed += FRICTION;
     }
 
-    // MOVE ON CURVE
+    // MOVE ALONG CURVE
     t += speed;
     t = THREE.MathUtils.clamp(t, 0, 1);
 
-    // LEFT / RIGHT
+    // LANE MOVEMENT
     if (keys.lft) lateralOffset += TURN_STRENGTH;
     if (keys.rgt) lateralOffset -= TURN_STRENGTH;
 
     lateralOffset = THREE.MathUtils.clamp(lateralOffset, -3.5, 3.5);
 
-    // CURVE POSITION
+    // CAR POSITION
     const point = curve.getPoint(t);
     const tangent = curve.getTangent(t);
-
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-    const finalPos = point.clone().add(normal.multiplyScalar(lateralOffset));
 
+    const finalPos = point.clone().add(normal.multiplyScalar(lateralOffset));
     car.position.copy(finalPos);
 
-    // ROTATION
     car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
 
-    // ANIMATION
+    // CAR ANIMATION
     if (carBody) {
       carBody.rotation.x = THREE.MathUtils.lerp(
         carBody.rotation.x,
@@ -160,6 +161,34 @@ export const initThreeGame = ({
 
     tires.forEach((tire: THREE.Mesh) => {
       tire.rotation.x += speed * 50;
+    });
+
+    // 🚗 AI TRAFFIC UPDATE
+    trafficCars.forEach((ai: any) => {
+      ai.t += ai.speed;
+
+      if (ai.t > 1) ai.t = 0;
+
+      // random lane change
+      if (Math.random() < 0.002) {
+        ai.targetLane = Math.floor(Math.random() * LANES);
+      }
+
+      ai.lane += (ai.targetLane - ai.lane) * 0.05;
+
+      const p = curve.getPoint(ai.t);
+      const tan = curve.getTangent(ai.t);
+      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+
+      const laneOffset =
+        -ROAD_WIDTH / 2 + ai.lane * LANE_WIDTH + LANE_WIDTH / 2;
+
+      const pos = p.clone().add(n.multiplyScalar(laneOffset));
+
+      ai.mesh.position.copy(pos);
+      ai.mesh.position.y = 0.4;
+
+      ai.mesh.rotation.y = Math.atan2(-tan.x, -tan.z);
     });
 
     // COLLISION
