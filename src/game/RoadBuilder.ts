@@ -3,105 +3,97 @@ import * as THREE from 'three';
 export const buildRoads = (scene: THREE.Scene) => {
   const obstacles: THREE.Mesh[] = [];
 
-  // ── CONFIG ───────────────────────────
-  const ROAD_LENGTH = 2000;
-  const LANE_WIDTH = 3;
-  const LANES = 3;
-  const ROAD_WIDTH = LANE_WIDTH * LANES;
+  // ── ROAD SETTINGS ────────────────────
+  const ROAD_WIDTH = 9;
+  const SEGMENTS = 200;
 
-  // ── ROAD BASE ────────────────────────
-  const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_WIDTH, ROAD_LENGTH),
-    new THREE.MeshStandardMaterial({
-      color: 0x2b2b2b,
-      roughness: 0.9,
-    })
-  );
+  // ── DEFINE CURVE PATH ────────────────
+  const points = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -50),
+    new THREE.Vector3(10, 0, -100),   // turn right
+    new THREE.Vector3(20, 0, -150),
+    new THREE.Vector3(0, 0, -200),    // turn left
+    new THREE.Vector3(-20, 0, -250),
+    new THREE.Vector3(-10, 0, -300),
+    new THREE.Vector3(0, 0, -350),
+  ];
 
-  road.rotation.x = -Math.PI / 2;
-  scene.add(road);
+  const curve = new THREE.CatmullRomCurve3(points);
 
-  // ── LANE DASHED LINES ────────────────
-  const dashMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  // ── CREATE ROAD GEOMETRY ─────────────
+  const geometry = new THREE.BufferGeometry();
 
-  for (let lane = 1; lane < LANES; lane++) {
-    const x = -ROAD_WIDTH / 2 + lane * LANE_WIDTH;
+  const vertices: number[] = [];
+  const indices: number[] = [];
 
-    for (let z = -ROAD_LENGTH / 2; z < ROAD_LENGTH / 2; z += 12) {
-      const dash = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.2, 5),
-        dashMaterial
-      );
+  for (let i = 0; i <= SEGMENTS; i++) {
+    const t = i / SEGMENTS;
 
-      dash.rotation.x = -Math.PI / 2;
-      dash.position.set(x, 0.02, z);
-      scene.add(dash);
+    const point = curve.getPoint(t);
+    const tangent = curve.getTangent(t);
+
+    // perpendicular direction
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+    const left = point.clone().add(normal.clone().multiplyScalar(ROAD_WIDTH / 2));
+    const right = point.clone().add(normal.clone().multiplyScalar(-ROAD_WIDTH / 2));
+
+    vertices.push(left.x, left.y, left.z);
+    vertices.push(right.x, right.y, right.z);
+
+    if (i < SEGMENTS) {
+      const base = i * 2;
+
+      indices.push(base, base + 1, base + 2);
+      indices.push(base + 1, base + 3, base + 2);
     }
   }
 
-  // ── SIDE SOLID LINES ─────────────────
-  const sideLineMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-
-  [-ROAD_WIDTH / 2, ROAD_WIDTH / 2].forEach((x) => {
-    for (let z = -ROAD_LENGTH / 2; z < ROAD_LENGTH / 2; z += 8) {
-      const line = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.3, 6),
-        sideLineMaterial
-      );
-
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(x, 0.02, z);
-      scene.add(line);
-    }
-  });
-
-  // ── ROAD SHOULDERS ───────────────────
-  const shoulderMaterial = new THREE.MeshStandardMaterial({
-    color: 0x444444,
-  });
-
-  const shoulderWidth = 2;
-
-  [-1, 1].forEach((side) => {
-    const shoulder = new THREE.Mesh(
-      new THREE.PlaneGeometry(shoulderWidth, ROAD_LENGTH),
-      shoulderMaterial
-    );
-
-    shoulder.rotation.x = -Math.PI / 2;
-    shoulder.position.set(
-      side * (ROAD_WIDTH / 2 + shoulderWidth / 2),
-      0.01,
-      0
-    );
-
-    scene.add(shoulder);
-  });
-
-  // ── GRASS ENVIRONMENT ────────────────
-  const grass = new THREE.Mesh(
-    new THREE.PlaneGeometry(300, ROAD_LENGTH),
-    new THREE.MeshStandardMaterial({ color: 0x1f7a1f })
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(vertices, 3)
   );
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.y = -0.05;
-  scene.add(grass);
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x2b2b2b,
+    side: THREE.DoubleSide,
+  });
 
-  // ── OBSTACLES (cars / blocks) ───────
-  for (let i = 0; i < 15; i++) {
+  const road = new THREE.Mesh(geometry, material);
+  scene.add(road);
+
+  // ── ADD LANE LINES ───────────────────
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+  for (let i = 0; i < SEGMENTS; i += 5) {
+    const t = i / SEGMENTS;
+
+    const point = curve.getPoint(t);
+
+    const dash = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3, 3),
+      lineMaterial
+    );
+
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(point.x, 0.05, point.z);
+    scene.add(dash);
+  }
+
+  // ── OBSTACLES ON CURVE ───────────────
+  for (let i = 10; i < SEGMENTS; i += 20) {
+    const t = i / SEGMENTS;
+    const point = curve.getPoint(t);
+
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(1.5, 1, 3),
       new THREE.MeshStandardMaterial({ color: 0xff3333 })
     );
 
-    const laneIndex = Math.floor(Math.random() * LANES);
-    const x =
-      -ROAD_WIDTH / 2 +
-      laneIndex * LANE_WIDTH +
-      LANE_WIDTH / 2;
-
-    box.position.set(x, 0.5, -50 - i * 60);
+    box.position.set(point.x, 0.5, point.z);
 
     scene.add(box);
     obstacles.push(box);
