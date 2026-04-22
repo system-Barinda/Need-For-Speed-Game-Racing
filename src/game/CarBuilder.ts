@@ -156,7 +156,7 @@ export const createCar = (scene: THREE.Scene) => {
     tires.push(tire);
   });
 
-  // ── FINAL POSITION ───────────────────
+ 
   car.position.set(0, 0, 0);
 
   return {
