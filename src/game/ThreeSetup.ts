@@ -30,6 +30,10 @@ export const initThreeGame = ({
   renderer.shadowMap.enabled = true;
   mount.appendChild(renderer.domElement);
 
+  // 👉 IMPORTANT: focus canvas (keyboard fix)
+  renderer.domElement.setAttribute('tabindex', '0');
+  renderer.domElement.focus();
+
   // ── Lights ────────────────────────────
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
@@ -39,21 +43,21 @@ export const initThreeGame = ({
   scene.add(sun);
 
   // ── World ─────────────────────────────
-  const { obstacles, curve } = buildRoads(scene); // 👈 IMPORTANT (curve)
+  const { obstacles, curve } = buildRoads(scene);
 
   // ── Car ───────────────────────────────
   const { car, carBody, tires } = createCar(scene);
 
   // ── Game state ────────────────────────
   let speed = 0;
-  let t = 0; // 👈 position on curve (0 → 1)
+  let t = 0;
 
   const MAX_SPEED = 0.0025;
   const ACCEL = 0.00008;
   const FRICTION = 0.00004;
   const TURN_STRENGTH = 0.002;
 
-  let lateralOffset = 0; // 👈 move left/right on road
+  let lateralOffset = 0;
 
   const keys = {
     fwd: false,
@@ -63,14 +67,22 @@ export const initThreeGame = ({
     reset: false,
   };
 
-  // ── Controls ──────────────────────────
+  // ── Controls (🔥 FIXED) ───────────────
   const onKeyDown = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
 
-    if (k === 'w' || e.key === 'ArrowUp') keys.fwd = true;
-    if (k === 's' || e.key === 'ArrowDown') keys.bwd = true;
-    if (k === 'a' || e.key === 'ArrowLeft') keys.lft = true;
-    if (k === 'd' || e.key === 'ArrowRight') keys.rgt = true;
+    // 👉 STOP browser scrolling
+    if (
+      ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)
+    ) {
+      e.preventDefault();
+    }
+
+    if (k === 'w' || k === 'arrowup') keys.fwd = true;
+    if (k === 's' || k === 'arrowdown') keys.bwd = true;
+    if (k === 'a' || k === 'arrowleft') keys.lft = true;
+    if (k === 'd' || k === 'arrowright') keys.rgt = true;
+
     if (k === 'r') keys.reset = true;
     if (k === 'm') toggleMiniMap();
   };
@@ -78,13 +90,14 @@ export const initThreeGame = ({
   const onKeyUp = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
 
-    if (k === 'w' || e.key === 'ArrowUp') keys.fwd = false;
-    if (k === 's' || e.key === 'ArrowDown') keys.bwd = false;
-    if (k === 'a' || e.key === 'ArrowLeft') keys.lft = false;
-    if (k === 'd' || e.key === 'ArrowRight') keys.rgt = false;
+    if (k === 'w' || k === 'arrowup') keys.fwd = false;
+    if (k === 's' || k === 'arrowdown') keys.bwd = false;
+    if (k === 'a' || k === 'arrowleft') keys.lft = false;
+    if (k === 'd' || k === 'arrowright') keys.rgt = false;
   };
 
-  window.addEventListener('keydown', onKeyDown);
+  // 👉 Attach to window (global capture)
+  window.addEventListener('keydown', onKeyDown, { passive: false });
   window.addEventListener('keyup', onKeyUp);
 
   // ── Camera ────────────────────────────
@@ -114,30 +127,29 @@ export const initThreeGame = ({
       if (speed < 0) speed += FRICTION;
     }
 
-    // MOVE ALONG CURVE ✅
+    // MOVE ON CURVE
     t += speed;
-    t = Math.max(0, Math.min(1, t));
+    t = THREE.MathUtils.clamp(t, 0, 1);
 
-    // TURN LEFT/RIGHT (lane movement)
+    // LEFT / RIGHT
     if (keys.lft) lateralOffset += TURN_STRENGTH;
     if (keys.rgt) lateralOffset -= TURN_STRENGTH;
 
     lateralOffset = THREE.MathUtils.clamp(lateralOffset, -3.5, 3.5);
 
-    // GET CURVE POSITION
+    // CURVE POSITION
     const point = curve.getPoint(t);
     const tangent = curve.getTangent(t);
 
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
     const finalPos = point.clone().add(normal.multiplyScalar(lateralOffset));
 
     car.position.copy(finalPos);
 
-    // ROTATE CAR TO FOLLOW ROAD ✅
+    // ROTATION
     car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
 
-    // CAR ANIMATION
+    // ANIMATION
     if (carBody) {
       carBody.rotation.x = THREE.MathUtils.lerp(
         carBody.rotation.x,
@@ -150,7 +162,7 @@ export const initThreeGame = ({
       tire.rotation.x += speed * 50;
     });
 
-    // COLLISION DETECTION ✅
+    // COLLISION
     obstacles.forEach((obs: THREE.Mesh) => {
       if (car.position.distanceTo(obs.position) < 1.5) {
         setCrash(true);
@@ -158,7 +170,7 @@ export const initThreeGame = ({
       }
     });
 
-    // CAMERA FOLLOW ✅
+    // CAMERA
     const camOffset = new THREE.Vector3(0, 4, 10).applyEuler(
       new THREE.Euler(0, car.rotation.y, 0)
     );
@@ -173,7 +185,7 @@ export const initThreeGame = ({
 
     camera.lookAt(camTarget);
 
-    // SUN FOLLOW
+    // LIGHT FOLLOW
     sun.position.set(
       car.position.x + 30,
       car.position.y + 60,
