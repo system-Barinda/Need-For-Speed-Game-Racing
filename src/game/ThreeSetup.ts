@@ -30,10 +30,6 @@ export const initThreeGame = ({
   renderer.shadowMap.enabled = true;
   mount.appendChild(renderer.domElement);
 
-  // 👉 keyboard focus
-  renderer.domElement.setAttribute('tabindex', '0');
-  renderer.domElement.focus();
-
   // ── Lights ────────────────────────────
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
@@ -41,8 +37,9 @@ export const initThreeGame = ({
   sun.position.set(30, 60, 20);
   sun.castShadow = true;
   scene.add(sun);
+  scene.add(sun.target);
 
-  // ── World (🔥 IMPORTANT UPDATE) ───────
+  // ── World ─────────────────────────────
   const {
     obstacles,
     curve,
@@ -58,52 +55,63 @@ export const initThreeGame = ({
   // ── Game state ────────────────────────
   let speed = 0;
   let t = 0;
+  let lateralOffset = 0;
+  let crashed = false;
+
+  // ⛔ NEW: spawn protection timer (VERY IMPORTANT)
+  let spawnSafeTime = 0;
 
   const MAX_SPEED = 0.0025;
   const ACCEL = 0.00008;
   const FRICTION = 0.00004;
   const TURN_STRENGTH = 0.002;
 
-  let lateralOffset = 0;
+  // ── KEY SYSTEM ────────────────────────
+  const keysDown = new Set<string>();
 
-  const keys = {
-    fwd: false,
-    bwd: false,
-    lft: false,
-    rgt: false,
-    reset: false,
+  const normalizeKey = (key: string): string => {
+    switch (key) {
+      case 'ArrowUp': return 'fwd';
+      case 'ArrowDown': return 'bwd';
+      case 'ArrowLeft': return 'lft';
+      case 'ArrowRight': return 'rgt';
+      case 'w': case 'W': return 'fwd';
+      case 's': case 'S': return 'bwd';
+      case 'a': case 'A': return 'lft';
+      case 'd': case 'D': return 'rgt';
+      default: return key.toLowerCase();
+    }
   };
 
-  // ── Controls ──────────────────────────
   const onKeyDown = (e: KeyboardEvent) => {
-    const k = e.key.toLowerCase();
-
-    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
       e.preventDefault();
     }
 
-    if (k === 'w' || k === 'arrowup') keys.fwd = true;
-    if (k === 's' || k === 'arrowdown') keys.bwd = true;
-    if (k === 'a' || k === 'arrowleft') keys.lft = true;
-    if (k === 'd' || k === 'arrowright') keys.rgt = true;
+    const mapped = normalizeKey(e.key);
+    keysDown.add(mapped);
 
-    if (k === 'r') keys.reset = true;
-    if (k === 'm') toggleMiniMap();
+    if (mapped === 'r') {
+      t = 0;
+      lateralOffset = 0;
+      speed = 0;
+      crashed = false;
+      spawnSafeTime = 0; // reset protection
+      setCrash(false);
+      keysDown.clear();
+    }
+
+    if (mapped === 'm') toggleMiniMap?.();
   };
 
   const onKeyUp = (e: KeyboardEvent) => {
-    const k = e.key.toLowerCase();
-
-    if (k === 'w' || k === 'arrowup') keys.fwd = false;
-    if (k === 's' || k === 'arrowdown') keys.bwd = false;
-    if (k === 'a' || k === 'arrowleft') keys.lft = false;
-    if (k === 'd' || k === 'arrowright') keys.rgt = false;
+    keysDown.delete(normalizeKey(e.key));
   };
 
   window.addEventListener('keydown', onKeyDown, { passive: false });
   window.addEventListener('keyup', onKeyUp);
 
-  // ── Camera ────────────────────────────
+  // ── Camera helpers ────────────────────
   const camPos = new THREE.Vector3();
   const camTarget = new THREE.Vector3();
 
@@ -113,63 +121,65 @@ export const initThreeGame = ({
   const animate = () => {
     animId = requestAnimationFrame(animate);
 
-    // RESET
-    if (keys.reset) {
-      t = 0;
-      lateralOffset = 0;
-      speed = 0;
-      setCrash(false);
-      keys.reset = false;
+    spawnSafeTime += 1; // ⛔ count frames
+
+    const isFwd = keysDown.has('fwd');
+    const isBwd = keysDown.has('bwd');
+    const isLft = keysDown.has('lft');
+    const isRgt = keysDown.has('rgt');
+
+    // ── SPEED ──
+    if (!crashed) {
+      if (isFwd) speed = Math.min(speed + ACCEL, MAX_SPEED);
+      else if (isBwd) speed = Math.max(speed - ACCEL, -MAX_SPEED * 0.5);
+      else {
+        if (speed > 0) speed = Math.max(speed - FRICTION, 0);
+        if (speed < 0) speed = Math.min(speed + FRICTION, 0);
+      }
+    } else {
+      speed *= 0.95;
     }
 
-    // SPEED
-    if (keys.fwd) speed = Math.min(speed + ACCEL, MAX_SPEED);
-    else if (keys.bwd) speed = Math.max(speed - ACCEL, -MAX_SPEED * 0.5);
-    else {
-      if (speed > 0) speed -= FRICTION;
-      if (speed < 0) speed += FRICTION;
-    }
+    // ── MOVE ──
+    t = THREE.MathUtils.clamp(t + speed, 0, 0.999);
 
-    // MOVE ALONG CURVE
-    t += speed;
-    t = THREE.MathUtils.clamp(t, 0, 1);
+    if (isLft) lateralOffset += TURN_STRENGTH;
+    if (isRgt) lateralOffset -= TURN_STRENGTH;
 
-    // LANE MOVEMENT
-    if (keys.lft) lateralOffset += TURN_STRENGTH;
-    if (keys.rgt) lateralOffset -= TURN_STRENGTH;
+    lateralOffset = THREE.MathUtils.clamp(
+      lateralOffset,
+      -ROAD_WIDTH / 2 + 0.5,
+      ROAD_WIDTH / 2 - 0.5
+    );
 
-    lateralOffset = THREE.MathUtils.clamp(lateralOffset, -3.5, 3.5);
-
-    // CAR POSITION
     const point = curve.getPoint(t);
     const tangent = curve.getTangent(t);
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-    const finalPos = point.clone().add(normal.multiplyScalar(lateralOffset));
-    car.position.copy(finalPos);
+    const pos = point.clone().add(normal.multiplyScalar(lateralOffset));
+    car.position.copy(pos);
 
     car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
 
-    // CAR ANIMATION
+    // ── CAR ANIMATION ──
     if (carBody) {
       carBody.rotation.x = THREE.MathUtils.lerp(
         carBody.rotation.x,
-        -speed * 10,
+        -speed * 50,
         0.1
       );
     }
 
     tires.forEach((tire: THREE.Mesh) => {
-      tire.rotation.x += speed * 50;
+      tire.rotation.x += speed * 40;
     });
 
-    // 🚗 AI TRAFFIC UPDATE
+    // ── AI TRAFFIC (SAFE) ──
     trafficCars.forEach((ai: any) => {
-      ai.t += ai.speed;
+      if (!ai.mesh) return;
 
-      if (ai.t > 1) ai.t = 0;
+      ai.t = (ai.t + ai.speed) % 1;
 
-      // random lane change
       if (Math.random() < 0.002) {
         ai.targetLane = Math.floor(Math.random() * LANES);
       }
@@ -183,45 +193,51 @@ export const initThreeGame = ({
       const laneOffset =
         -ROAD_WIDTH / 2 + ai.lane * LANE_WIDTH + LANE_WIDTH / 2;
 
-      const pos = p.clone().add(n.multiplyScalar(laneOffset));
-
-      ai.mesh.position.copy(pos);
-      ai.mesh.position.y = 0.4;
-
+      ai.mesh.position.copy(p.clone().add(n.multiplyScalar(laneOffset)));
       ai.mesh.rotation.y = Math.atan2(-tan.x, -tan.z);
     });
 
-    // COLLISION
-    obstacles.forEach((obs: THREE.Mesh) => {
-      if (car.position.distanceTo(obs.position) < 1.5) {
-        setCrash(true);
-        speed = 0;
-      }
-    });
+    // ── COLLISION (FIXED 🚀) ──
+    if (spawnSafeTime > 60) { // ⛔ wait ~1 second
+      obstacles.forEach((obs: THREE.Mesh) => {
+        if (!obs || !obs.position) return;
 
-    // CAMERA
-    const camOffset = new THREE.Vector3(0, 4, 10).applyEuler(
+        const dist = car.position.distanceTo(obs.position);
+
+        // ignore far objects
+        if (dist > 20) return;
+
+        if (dist < 1.8) {
+          crashed = true;
+          setCrash(true);
+          speed *= 0.5;
+        }
+      });
+    }
+
+    // ── CAMERA ──
+    const behind = new THREE.Vector3(0, 3.5, 9).applyEuler(
       new THREE.Euler(0, car.rotation.y, 0)
     );
 
-    camPos.lerp(car.position.clone().add(camOffset), 0.1);
+    camPos.lerp(car.position.clone().add(behind), 0.08);
     camera.position.copy(camPos);
 
     camTarget.lerp(
       new THREE.Vector3(car.position.x, car.position.y + 1, car.position.z),
-      0.2
+      0.15
     );
 
     camera.lookAt(camTarget);
 
-    // LIGHT FOLLOW
+    // ── LIGHT FOLLOW ──
     sun.position.set(
       car.position.x + 30,
       car.position.y + 60,
       car.position.z + 20
     );
 
-    // UI
+    // ── UI ──
     setCarMapPos({ x: car.position.x, z: car.position.z });
     setRoadInfo('CURVED HIGHWAY');
 
@@ -242,7 +258,6 @@ export const initThreeGame = ({
   // ── Cleanup ───────────────────────────
   return () => {
     cancelAnimationFrame(animId);
-
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('resize', onResize);
