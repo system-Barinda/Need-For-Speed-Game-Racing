@@ -27,6 +27,7 @@ export const initThreeGame = ({
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
   mount.appendChild(renderer.domElement);
 
   // ── Lights ────────────────────────────
@@ -34,6 +35,7 @@ export const initThreeGame = ({
 
   const sun = new THREE.DirectionalLight(0xffffff, 1.2);
   sun.position.set(30, 60, 20);
+  sun.castShadow = true;
   scene.add(sun);
 
   // ── World ─────────────────────────────
@@ -59,7 +61,10 @@ export const initThreeGame = ({
 
   // ── Controls ──────────────────────────
   const onKeyDown = (e: KeyboardEvent) => {
+    e.preventDefault(); // ✅ FIX scrolling issue
+
     const k = e.key.toLowerCase();
+
     if (k === 'w' || e.key === 'ArrowUp') keys.fwd = true;
     if (k === 's' || e.key === 'ArrowDown') keys.bwd = true;
     if (k === 'a' || e.key === 'ArrowLeft') keys.lft = true;
@@ -70,6 +75,7 @@ export const initThreeGame = ({
 
   const onKeyUp = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
+
     if (k === 'w' || e.key === 'ArrowUp') keys.fwd = false;
     if (k === 's' || e.key === 'ArrowDown') keys.bwd = false;
     if (k === 'a' || e.key === 'ArrowLeft') keys.lft = false;
@@ -114,7 +120,7 @@ export const initThreeGame = ({
       if (keys.rgt) car.rotation.y -= t;
     }
 
-    // MOVE
+    // MOVE CAR FIRST ✅
     const dir = new THREE.Vector3(
       -Math.sin(car.rotation.y),
       0,
@@ -135,7 +141,7 @@ export const initThreeGame = ({
       t.rotation.x += speed * 4;
     });
 
-    // CAMERA FOLLOW
+    // CAMERA FOLLOW ✅ (ONLY SYSTEM)
     const behind = OFFSET.clone().applyEuler(
       new THREE.Euler(0, car.rotation.y, 0)
     );
@@ -147,20 +153,21 @@ export const initThreeGame = ({
       new THREE.Vector3(car.position.x, car.position.y + 1, car.position.z),
       0.2
     );
+
     camera.lookAt(camTarget);
 
-    // SUN FOLLOW
+    // SUN FOLLOW ✅ FIXED
     sun.position.set(
       car.position.x + 30,
       car.position.y + 60,
       car.position.z + 20
     );
     sun.target.position.copy(car.position);
+    sun.target.updateMatrixWorld();
 
     // UPDATE UI
     setCarMapPos({ x: car.position.x, z: car.position.z });
 
-    // (optional simple road info)
     if (Math.abs(car.position.x) < 5) setRoadInfo('HIGHWAY');
     else setRoadInfo('OFF ROAD');
 

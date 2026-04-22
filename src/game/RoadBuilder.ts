@@ -3,78 +3,55 @@ import * as THREE from 'three';
 export const buildRoads = (scene: THREE.Scene) => {
   const obstacles: THREE.Mesh[] = [];
 
-  // ── Ground ─────────────────────────────
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(500, 2000),
-    new THREE.MeshStandardMaterial({ color: 0x4a8c3f })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // ── Main Road ──────────────────────────
+  // ── ROAD ─────────────────────────────
   const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 2000),
-    new THREE.MeshStandardMaterial({ color: 0x282828 })
+    new THREE.PlaneGeometry(20, 2000),
+    new THREE.MeshStandardMaterial({
+      color: 0x2b2b2b,
+      roughness: 0.9,
+    })
   );
+
   road.rotation.x = -Math.PI / 2;
-  road.position.y = 0.01;
-  road.receiveShadow = true;
   scene.add(road);
 
-  // ── Center dashed lines ────────────────
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  // ── ROAD LINES (CENTER) ──────────────
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-  for (let z = -1000; z < 1000; z += 12) {
-    const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 6), dashMat);
+  for (let i = -1000; i < 1000; i += 10) {
+    const dash = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 4),
+      lineMaterial
+    );
     dash.rotation.x = -Math.PI / 2;
-    dash.position.set(0, 0.02, z);
+    dash.position.set(0, 0.01, i);
     scene.add(dash);
   }
 
-  // ── Edge lines ─────────────────────────
-  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  // ── SIDE GRASS ───────────────────────
+  const grass = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 2000),
+    new THREE.MeshStandardMaterial({ color: 0x228822 })
+  );
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.y = -0.02;
+  scene.add(grass);
 
-  [-4.85, 4.85].forEach((x) => {
-    const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 2000), edgeMat);
-    edge.rotation.x = -Math.PI / 2;
-    edge.position.set(x, 0.02, 0);
-    scene.add(edge);
-  });
+  // ── OBSTACLES ────────────────────────
+  for (let i = 0; i < 10; i++) {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xff0000 })
+    );
 
-  // ── Trees (simple environment) ─────────
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a4f2a });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d6a2d });
+    box.position.set(
+      (Math.random() - 0.5) * 10,
+      0.5,
+      -50 - i * 50
+    );
 
-  for (let z = -900; z < 900; z += 20) {
-    [-8, 8].forEach((side) => {
-      const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.2, 0.25, 1.5, 6),
-        trunkMat
-      );
-      trunk.position.set(side, 0.75, z);
-      scene.add(trunk);
-
-      const leaves = new THREE.Mesh(
-        new THREE.ConeGeometry(1.2, 2.5, 6),
-        leafMat
-      );
-      leaves.position.set(side, 2.5, z);
-      scene.add(leaves);
-    });
-  }
-
-  // ── Obstacles ──────────────────────────
-  const obsMat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
-
-  for (let z = -200; z > -900; z -= 60) {
-    [-3.5, 3.5].forEach((x) => {
-      const obs = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1.2), obsMat);
-      obs.position.set(x + (Math.random() - 0.5), 0.5, z);
-      obs.castShadow = true;
-      scene.add(obs);
-      obstacles.push(obs);
-    });
+    scene.add(box);
+    obstacles.push(box);
   }
 
   return obstacles;

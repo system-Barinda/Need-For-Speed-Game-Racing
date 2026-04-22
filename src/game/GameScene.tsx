@@ -3,7 +3,7 @@ import { initThreeGame } from './ThreeSetup';
 
 const GameScene = () => {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const initialized = useRef(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const [crash, setCrash] = useState(false);
   const [miniMap, setMiniMap] = useState(false);
@@ -11,13 +11,13 @@ const GameScene = () => {
   const [carMapPos, setCarMapPos] = useState({ x: 0, z: 0 });
 
   useEffect(() => {
-    if (!mountRef.current || initialized.current) return;
-    initialized.current = true;
+    if (!mountRef.current) return;
 
-    let cleanup: (() => void) | undefined;
+    // Prevent double initialization
+    if (cleanupRef.current) return;
 
     try {
-      cleanup = initThreeGame({
+      cleanupRef.current = initThreeGame({
         mount: mountRef.current,
         setCrash,
         setRoadInfo,
@@ -25,19 +25,24 @@ const GameScene = () => {
         toggleMiniMap: () => setMiniMap((p) => !p),
       });
 
-      // 👉 focus canvas so keyboard works
-      const canvas = mountRef.current.querySelector('canvas');
-      if (canvas) {
-        canvas.setAttribute('tabindex', '1');
-        (canvas as HTMLCanvasElement).focus();
-      }
+      // Focus canvas for keyboard input
+      setTimeout(() => {
+        const canvas = mountRef.current?.querySelector('canvas');
+        if (canvas) {
+          canvas.setAttribute('tabindex', '1');
+          (canvas as HTMLCanvasElement).focus();
+        }
+      }, 0);
+
     } catch (err) {
       console.error('Game init failed:', err);
     }
 
     return () => {
-      cleanup && cleanup();
-      initialized.current = false;
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
     };
   }, []);
 
@@ -58,16 +63,18 @@ const GameScene = () => {
   return (
     <div
       style={{
-        position: 'relative',
+        position: 'fixed', // ✅ FIX: prevents scroll issues
+        top: 0,
+        left: 0,
         width: '100vw',
         height: '100vh',
-        overflow: 'hidden', // ✅ FIX scroll issue
+        overflow: 'hidden',
       }}
     >
       {/* THREE CANVAS */}
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* ROAD INFO HUD */}
+      {/* ROAD INFO */}
       <div
         style={{
           position: 'absolute',
@@ -76,10 +83,8 @@ const GameScene = () => {
           background: 'rgba(0,0,0,0.7)',
           color: '#00ff88',
           fontFamily: 'monospace',
-          fontSize: 14,
           padding: '8px 16px',
           borderRadius: 6,
-          borderLeft: '3px solid #00ff88',
         }}
       >
         📍 {roadInfo}
@@ -95,17 +100,15 @@ const GameScene = () => {
           background: 'rgba(0,0,0,0.7)',
           color: '#ffdd88',
           fontFamily: 'monospace',
-          fontSize: 13,
           padding: '6px 14px',
           borderRadius: 6,
           cursor: 'pointer',
-          userSelect: 'none',
         }}
       >
         🗺 Map [{miniMap ? 'ON' : 'OFF'}]
       </div>
 
-      {/* MINI MAP PANEL */}
+      {/* MINI MAP */}
       {miniMap && (
         <div
           style={{
@@ -116,14 +119,12 @@ const GameScene = () => {
             height: MAP_H,
             background: 'rgba(0,0,0,0.8)',
             borderRadius: 8,
-            border: '1px solid #555',
             overflow: 'hidden',
           }}
         >
           <svg width={MAP_W} height={MAP_H}>
             <rect width={MAP_W} height={MAP_H} fill="#2a4a2a" />
 
-            {/* Car */}
             <circle
               cx={carMX}
               cy={carMY}
@@ -136,7 +137,7 @@ const GameScene = () => {
         </div>
       )}
 
-      {/* CONTROLS HUD */}
+      {/* CONTROLS */}
       <div
         style={{
           position: 'absolute',
@@ -145,7 +146,6 @@ const GameScene = () => {
           transform: 'translateX(-50%)',
           color: '#fff',
           fontFamily: 'monospace',
-          fontSize: 13,
           background: 'rgba(0,0,0,0.6)',
           padding: '10px 20px',
           borderRadius: 8,
@@ -154,7 +154,7 @@ const GameScene = () => {
         W/↑ Accel | S/↓ Brake | A/← Left | D/→ Right | R Reset | M Map
       </div>
 
-      {/* CRASH OVERLAY */}
+      {/* CRASH */}
       {crash && (
         <div
           style={{
@@ -164,20 +164,13 @@ const GameScene = () => {
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'column',
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.6)',
           }}
         >
-          <h1
-            style={{
-              color: '#ff3333',
-              fontSize: 60,
-              fontFamily: 'monospace',
-              margin: 0,
-            }}
-          >
+          <h1 style={{ color: '#ff3333', fontSize: 60 }}>
             CRASH!
           </h1>
-          <p style={{ color: '#fff', marginTop: 10 }}>
+          <p style={{ color: '#fff' }}>
             Press <b>R</b> to restart
           </p>
         </div>
