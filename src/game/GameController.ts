@@ -14,13 +14,12 @@ export class GameController {
   private crashed = false;
   private spawnSafeTime = 0;
 
-  // 🔥 IMPROVED VALUES (VISIBLE MOVEMENT)
+  // 🔥 Tuned values (smooth + responsive)
   private MAX_SPEED = 0.01;
   private ACCEL = 0.0005;
   private FRICTION = 0.0002;
   private TURN_STRENGTH = 0.02;
 
-  // road limits (match RoadBuilder)
   private ROAD_WIDTH = 10.5;
 
   constructor(
@@ -40,7 +39,7 @@ export class GameController {
   update() {
     this.spawnSafeTime++;
 
-    // 🚗 Update traffic (VERY IMPORTANT)
+    // 🚗 Update traffic
     if (this.updateTraffic) {
       this.updateTraffic();
     }
@@ -50,14 +49,15 @@ export class GameController {
     const isLft = this.input.isPressed("lft");
     const isRgt = this.input.isPressed("rgt");
 
-    // ── RESET ──
+    // 🔄 RESET (press R)
     if (this.input.isPressed("r")) {
       this.reset();
       return;
     }
 
-    // ── SPEED CONTROL ──
-    if (!this.crashed) {
+    // ── SPEED ──
+    if (!this.crashed || isFwd) {
+      // allow recovery if player presses forward
       if (isFwd) {
         this.speed = Math.min(this.speed + this.ACCEL, this.MAX_SPEED);
       } else if (isBwd) {
@@ -72,34 +72,43 @@ export class GameController {
       this.speed *= 0.95;
     }
 
-    // ── MOVE ALONG ROAD ──
-    this.t = THREE.MathUtils.clamp(this.t + this.speed, 0, 0.999);
+    // ── MOVE (FIXED: NO MORE FREEZE) ──
+    this.t += this.speed;
+
+    // 🔁 LOOP ROAD (CRITICAL FIX)
+    if (this.t > 1) this.t = 0;
+    if (this.t < 0) this.t = 0;
 
     // ── STEERING ──
     if (isLft) this.lateralOffset += this.TURN_STRENGTH;
     if (isRgt) this.lateralOffset -= this.TURN_STRENGTH;
 
-    // clamp inside road
-    const maxOffset = this.ROAD_WIDTH / 2 - 0.5;
-    this.lateralOffset = THREE.MathUtils.clamp(
-      this.lateralOffset,
-      -maxOffset,
-      maxOffset
-    );
+    // 🔥 SOFT ROAD LIMIT (NO HARD BLOCK)
+    const limit = this.ROAD_WIDTH / 2 - 0.5;
+
+    if (this.lateralOffset > limit) {
+      this.lateralOffset = limit;
+      this.speed *= 0.98; // slight slow when hitting edge
+    }
+
+    if (this.lateralOffset < -limit) {
+      this.lateralOffset = -limit;
+      this.speed *= 0.98;
+    }
 
     // ── FOLLOW CURVE ──
     const point = this.curve.getPoint(this.t);
     const tangent = this.curve.getTangent(this.t);
+
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
     const pos = point.clone().add(normal.multiplyScalar(this.lateralOffset));
 
-    // keep car above road
-    pos.y = 0.35;
+    pos.y = 0.35; // keep above road
 
     this.car.position.copy(pos);
 
-    // rotation (face forward)
+    // face forward
     this.car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
 
     // ── COLLISION ──
@@ -109,7 +118,6 @@ export class GameController {
 
         const dist = this.car.position.distanceTo(obs.position);
 
-        // ignore far objects (performance)
         if (dist > 20) continue;
 
         if (dist < 1.8) {
