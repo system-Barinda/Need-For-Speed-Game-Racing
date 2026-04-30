@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import * as THREE from "three";
-import { initThreeGame } from "./ThreeSetup";
-import { InputHandler } from "./InputHandler";
-import { GameController } from "./GameController";
+import { useEffect, useRef } from 'react';
+import * as THREE from 'three';
+import { initThreeGame } from './ThreeSetup';
+import { InputHandler } from './InputHandler';
+import { GameController } from './GameController';
 
 export default function GameScene() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -21,6 +21,23 @@ export default function GameScene() {
       updateTraffic,
       cleanup,
     } = initThreeGame({ mount: mountRef.current });
+
+    // ✅ SET INITIAL SIZE PROPERLY
+    const setSize = () => {
+      const width = mountRef.current!.clientWidth;
+      const height = mountRef.current!.clientHeight;
+
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+
+    setSize();
+
+    // ✅ HANDLE RESIZE (IMPORTANT)
+    window.addEventListener('resize', setSize);
 
     // ── INPUT + CONTROLLER ─────────────
     const input = new InputHandler();
@@ -57,11 +74,7 @@ export default function GameScene() {
 
       // smooth look at
       camTarget.lerp(
-        new THREE.Vector3(
-          car.position.x,
-          car.position.y + 1,
-          car.position.z
-        ),
+        new THREE.Vector3(car.position.x, car.position.y + 1, car.position.z),
         0.15
       );
 
@@ -77,13 +90,20 @@ export default function GameScene() {
       cancelAnimationFrame(animId);
       input.destroy();
       cleanup();
+      window.removeEventListener('resize', setSize); // ✅ clean listener
     };
   }, []);
 
   return (
     <div
       ref={mountRef}
-      style={{ width: "100%", height: "100vh", overflow: "hidden" }}
+      style={{
+        width: '100%',
+        height: '100vh',
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0,
+      }}
     />
   );
 }
