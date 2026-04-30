@@ -3,23 +3,22 @@ import { InputHandler } from "./InputHandler";
 
 export class GameController {
   private car: THREE.Object3D;
-  private curve: any;
+  private curve: any; // still kept if you need later
   private input: InputHandler;
   private obstacles: THREE.Mesh[];
   private updateTraffic?: () => void;
 
   private speed = 0;
-  private t = 0;
   private lateralOffset = 0;
   private crashed = false;
   private spawnSafeTime = 0;
 
   private blockForward = false;
 
-  private MAX_SPEED = 0.01;
-  private ACCEL = 0.0005;
-  private FRICTION = 0.0002;
-  private TURN_STRENGTH = 0.02;
+  private MAX_SPEED = 0.5; // increased because now we use direct movement
+  private ACCEL = 0.01;
+  private FRICTION = 0.005;
+  private TURN_STRENGTH = 0.2;
 
   private ROAD_WIDTH = 10.5;
 
@@ -100,63 +99,46 @@ export class GameController {
         if (!obs) continue;
 
         const dist = this.car.position.distanceTo(obs.position);
-        if (dist > 10) continue;
+        if (dist > 5) continue;
 
-        if (obs.position.z < this.car.position.z) {
-          const sideDiff = Math.abs(obs.position.x - this.car.position.x);
+        const sideDiff = Math.abs(obs.position.x - this.car.position.x);
 
-          if (sideDiff < 2 && dist < 3) {
-            this.blockForward = true;
-          }
+        if (sideDiff < 2 && dist < 3) {
+          this.blockForward = true;
         }
       }
     }
 
-    // ── MOVE ──
+    // ── FORWARD MOVEMENT (NO CURVE) ──
     if (!this.blockForward) {
-      this.t += this.speed;
+      this.car.position.z -= this.speed; // forward movement
     } else {
       this.speed *= 0.9;
     }
 
-    if (this.t > 1) this.t = 0;
-    if (this.t < 0) this.t = 0;
-
-    // ✅ FIXED STEERING (CORRECT DIRECTION)
+    // ── STEERING ──
     if (isLft) this.lateralOffset -= this.TURN_STRENGTH;
     if (isRgt) this.lateralOffset += this.TURN_STRENGTH;
 
     const limit = this.ROAD_WIDTH / 2 - 0.5;
 
-    if (this.lateralOffset > limit) {
-      this.lateralOffset = limit;
-      this.speed *= 0.98;
-    }
+    this.lateralOffset = Math.max(-limit, Math.min(limit, this.lateralOffset));
 
-    if (this.lateralOffset < -limit) {
-      this.lateralOffset = -limit;
-      this.speed *= 0.98;
-    }
+    this.car.position.x = this.lateralOffset;
 
-    // ── FOLLOW CURVE ──
-    const point = this.curve.getPoint(this.t);
-    const tangent = this.curve.getTangent(this.t);
-
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
-    const pos = point.clone().add(normal.multiplyScalar(this.lateralOffset));
-    pos.y = 0.35;
-
-    this.car.position.copy(pos);
-    this.car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
+    // Optional: slight rotation when turning
+    if (isLft) this.car.rotation.y = 0.1;
+    else if (isRgt) this.car.rotation.y = -0.1;
+    else this.car.rotation.y = 0;
   }
 
   private reset() {
     this.speed = 0;
-    this.t = 0;
     this.lateralOffset = 0;
     this.crashed = false;
     this.spawnSafeTime = 0;
     this.blockForward = false;
+
+    this.car.position.set(0, 0.35, 0);
   }
 }
