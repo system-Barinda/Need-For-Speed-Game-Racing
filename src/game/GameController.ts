@@ -14,7 +14,10 @@ export class GameController {
   private crashed = false;
   private spawnSafeTime = 0;
 
-  // 🔥 Tuned values (smooth + responsive)
+  // 🆕 collision control
+  private blockForward = false;
+
+  // 🔥 Tuned values
   private MAX_SPEED = 0.01;
   private ACCEL = 0.0005;
   private FRICTION = 0.0002;
@@ -38,6 +41,7 @@ export class GameController {
 
   update() {
     this.spawnSafeTime++;
+    this.blockForward = false; // reset every frame
 
     // 🚗 Update traffic
     if (this.updateTraffic) {
@@ -49,7 +53,7 @@ export class GameController {
     const isLft = this.input.isPressed("lft");
     const isRgt = this.input.isPressed("rgt");
 
-    // 🔄 RESET (press R)
+    // 🔄 RESET
     if (this.input.isPressed("r")) {
       this.reset();
       return;
@@ -57,38 +61,62 @@ export class GameController {
 
     // ── SPEED ──
     if (!this.crashed || isFwd) {
-      // allow recovery if player presses forward
       if (isFwd) {
         this.speed = Math.min(this.speed + this.ACCEL, this.MAX_SPEED);
       } else if (isBwd) {
         this.speed = Math.max(this.speed - this.ACCEL, -this.MAX_SPEED * 0.5);
       } else {
-        // friction
         if (this.speed > 0) this.speed = Math.max(this.speed - this.FRICTION, 0);
         if (this.speed < 0) this.speed = Math.min(this.speed + this.FRICTION, 0);
       }
     } else {
-      // slow down after crash
       this.speed *= 0.95;
     }
 
-    // ── MOVE (FIXED: NO MORE FREEZE) ──
-    this.t += this.speed;
+    // ── COLLISION (AHEAD CHECK) ──
+    if (this.spawnSafeTime > 60) {
+      for (const obs of this.obstacles) {
+        if (!obs) continue;
 
-    // 🔁 LOOP ROAD (CRITICAL FIX)
+        const dist = this.car.position.distanceTo(obs.position);
+
+        // only check nearby
+        if (dist > 10) continue;
+
+        // check if obstacle is roughly in front
+        if (obs.position.z < this.car.position.z) {
+          const sideDiff = Math.abs(obs.position.x - this.car.position.x);
+
+          // 🚫 same lane & close → block forward
+          if (sideDiff < 2 && dist < 3) {
+            this.blockForward = true;
+          }
+        }
+      }
+    }
+
+    // ── MOVE ──
+    if (!this.blockForward) {
+      this.t += this.speed;
+    } else {
+      // slight slowdown instead of passing through
+      this.speed *= 0.9;
+    }
+
+    // 🔁 LOOP ROAD
     if (this.t > 1) this.t = 0;
     if (this.t < 0) this.t = 0;
 
-    // ── STEERING ──
+    // ── STEERING (ALWAYS ALLOWED) ──
     if (isLft) this.lateralOffset += this.TURN_STRENGTH;
     if (isRgt) this.lateralOffset -= this.TURN_STRENGTH;
 
-    // 🔥 SOFT ROAD LIMIT (NO HARD BLOCK)
+    // ROAD LIMIT
     const limit = this.ROAD_WIDTH / 2 - 0.5;
 
     if (this.lateralOffset > limit) {
       this.lateralOffset = limit;
-      this.speed *= 0.98; // slight slow when hitting edge
+      this.speed *= 0.98;
     }
 
     if (this.lateralOffset < -limit) {
@@ -103,38 +131,19 @@ export class GameController {
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
     const pos = point.clone().add(normal.multiplyScalar(this.lateralOffset));
-
-    pos.y = 0.35; // keep above road
+    pos.y = 0.35;
 
     this.car.position.copy(pos);
 
-    // face forward
     this.car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
-
-    // ── COLLISION ──
-    if (this.spawnSafeTime > 60 && !this.crashed) {
-      for (const obs of this.obstacles) {
-        if (!obs || !obs.position) continue;
-
-        const dist = this.car.position.distanceTo(obs.position);
-
-        if (dist > 20) continue;
-
-        if (dist < 1.8) {
-          this.crashed = true;
-          this.speed *= 0.5;
-          break;
-        }
-      }
-    }
   }
 
-  // 🔄 RESET GAME
   private reset() {
     this.speed = 0;
     this.t = 0;
     this.lateralOffset = 0;
     this.crashed = false;
     this.spawnSafeTime = 0;
+    this.blockForward = false;
   }
 }
