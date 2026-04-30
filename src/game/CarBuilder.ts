@@ -31,19 +31,14 @@ export const createCar = (scene: THREE.Scene) => {
   });
 
   // ── LOWER BODY ───────────────────────
-  const lowerBody = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 0.5, 4.2),
-    bodyMat
-  );
+  const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 4.2), bodyMat);
   lowerBody.position.y = 0.4;
+
   lowerBody.castShadow = true;
   car.add(lowerBody);
 
   // ── CABIN ────────────────────────────
-  const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.6, 2.2),
-    bodyMat
-  );
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2.2), bodyMat);
   cabin.position.set(0, 0.95, -0.2);
   cabin.castShadow = true;
   car.add(cabin);
@@ -58,20 +53,14 @@ export const createCar = (scene: THREE.Scene) => {
   car.add(windshield);
 
   // ── REAR WINDOW ──────────────────────
-  const rearGlass = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.5, 0.5),
-    glassMat
-  );
+  const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.5), glassMat);
   rearGlass.position.set(0, 0.95, -1.3);
   rearGlass.rotation.x = Math.PI * 0.2;
   car.add(rearGlass);
 
   // ── SIDE WINDOWS ─────────────────────
   [-0.9, 0.9].forEach((x) => {
-    const side = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 0.45),
-      glassMat
-    );
+    const side = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.45), glassMat);
     side.position.set(x, 0.95, -0.2);
     side.rotation.y = Math.PI / 2;
     car.add(side);
@@ -156,7 +145,6 @@ export const createCar = (scene: THREE.Scene) => {
     tires.push(tire);
   });
 
- 
   car.position.set(0, 0, 0);
 
   return {
