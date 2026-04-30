@@ -23,7 +23,6 @@ export class GameController {
 
   private ROAD_WIDTH = 10.5;
 
-  // 🆕 fallback keyboard state
   private keys: Record<string, boolean> = {};
 
   constructor(
@@ -39,7 +38,6 @@ export class GameController {
     this.input = input;
     this.updateTraffic = updateTraffic;
 
-    // ✅ DIRECT KEYBOARD SUPPORT (ARROWS + WASD)
     window.addEventListener("keydown", (e) => {
       this.keys[e.key.toLowerCase()] = true;
     });
@@ -57,7 +55,6 @@ export class GameController {
       this.updateTraffic();
     }
 
-    // ✅ SUPPORT BOTH INPUT HANDLER + KEYBOARD
     const isFwd =
       this.input.isPressed("fwd") ||
       this.keys["arrowup"] ||
@@ -97,7 +94,7 @@ export class GameController {
       this.speed *= 0.95;
     }
 
-    // ── COLLISION (BLOCK FORWARD) ──
+    // ── COLLISION ──
     if (this.spawnSafeTime > 60) {
       for (const obs of this.obstacles) {
         if (!obs) continue;
@@ -125,9 +122,9 @@ export class GameController {
     if (this.t > 1) this.t = 0;
     if (this.t < 0) this.t = 0;
 
-    // ── STEERING ──
-    if (isLft) this.lateralOffset += this.TURN_STRENGTH;
-    if (isRgt) this.lateralOffset -= this.TURN_STRENGTH;
+    // ✅ FIXED STEERING (CORRECT DIRECTION)
+    if (isLft) this.lateralOffset -= this.TURN_STRENGTH;
+    if (isRgt) this.lateralOffset += this.TURN_STRENGTH;
 
     const limit = this.ROAD_WIDTH / 2 - 0.5;
 
