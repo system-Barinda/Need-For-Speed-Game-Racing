@@ -3,24 +3,20 @@ import { InputHandler } from "./InputHandler";
 
 export class GameController {
   private car: THREE.Object3D;
-  private curve: any; // still kept if you need later
+  private curve: any;
   private input: InputHandler;
   private obstacles: THREE.Mesh[];
   private updateTraffic?: () => void;
 
   private speed = 0;
-  private lateralOffset = 0;
   private crashed = false;
   private spawnSafeTime = 0;
 
   private blockForward = false;
 
-  private MAX_SPEED = 0.5; // increased because now we use direct movement
+  private MAX_SPEED = 0.5;
   private ACCEL = 0.01;
   private FRICTION = 0.005;
-  private TURN_STRENGTH = 0.2;
-
-  private ROAD_WIDTH = 10.5;
 
   private keys: Record<string, boolean> = {};
 
@@ -109,36 +105,47 @@ export class GameController {
       }
     }
 
-    // ── FORWARD MOVEMENT (NO CURVE) ──
+    // ── REALISTIC STEERING ──
+    let steer = 0;
+    if (isLft) steer = 1;
+    if (isRgt) steer = -1;
+
+    // Smooth turning
+    this.car.rotation.y += steer * 0.03;
+
+    // Limit max turning angle
+    const maxTurn = 0.6;
+    this.car.rotation.y = Math.max(
+      -maxTurn,
+      Math.min(maxTurn, this.car.rotation.y)
+    );
+
+    // Auto-straighten when no input
+    if (!isLft && !isRgt) {
+      this.car.rotation.y *= 0.9;
+    }
+
+    // ── FORWARD MOVEMENT BASED ON ROTATION ──
     if (!this.blockForward) {
-      this.car.position.z -= this.speed; // forward movement
+      const forward = new THREE.Vector3(0, 0, -1);
+      forward.applyQuaternion(this.car.quaternion);
+
+      this.car.position.add(forward.multiplyScalar(this.speed));
     } else {
       this.speed *= 0.9;
     }
 
-    // ── STEERING ──
-    if (isLft) this.lateralOffset -= this.TURN_STRENGTH;
-    if (isRgt) this.lateralOffset += this.TURN_STRENGTH;
-
-    const limit = this.ROAD_WIDTH / 2 - 0.5;
-
-    this.lateralOffset = Math.max(-limit, Math.min(limit, this.lateralOffset));
-
-    this.car.position.x = this.lateralOffset;
-
-    // Optional: slight rotation when turning
-    if (isLft) this.car.rotation.y = 0.1;
-    else if (isRgt) this.car.rotation.y = -0.1;
-    else this.car.rotation.y = 0;
+    // Optional: slight drift smoothing
+    this.car.rotation.y *= 0.98;
   }
 
   private reset() {
     this.speed = 0;
-    this.lateralOffset = 0;
     this.crashed = false;
     this.spawnSafeTime = 0;
     this.blockForward = false;
 
     this.car.position.set(0, 0.35, 0);
+    this.car.rotation.set(0, 0, 0);
   }
 }
