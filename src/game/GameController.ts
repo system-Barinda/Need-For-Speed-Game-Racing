@@ -14,16 +14,17 @@ export class GameController {
   private crashed = false;
   private spawnSafeTime = 0;
 
-  // 🆕 collision control
   private blockForward = false;
 
-  // 🔥 Tuned values
   private MAX_SPEED = 0.01;
   private ACCEL = 0.0005;
   private FRICTION = 0.0002;
   private TURN_STRENGTH = 0.02;
 
   private ROAD_WIDTH = 10.5;
+
+  // 🆕 fallback keyboard state
+  private keys: Record<string, boolean> = {};
 
   constructor(
     car: THREE.Object3D,
@@ -37,23 +38,46 @@ export class GameController {
     this.obstacles = obstacles;
     this.input = input;
     this.updateTraffic = updateTraffic;
+
+    // ✅ DIRECT KEYBOARD SUPPORT (ARROWS + WASD)
+    window.addEventListener("keydown", (e) => {
+      this.keys[e.key.toLowerCase()] = true;
+    });
+
+    window.addEventListener("keyup", (e) => {
+      this.keys[e.key.toLowerCase()] = false;
+    });
   }
 
   update() {
     this.spawnSafeTime++;
-    this.blockForward = false; // reset every frame
+    this.blockForward = false;
 
-    // 🚗 Update traffic
     if (this.updateTraffic) {
       this.updateTraffic();
     }
 
-    const isFwd = this.input.isPressed("fwd");
-    const isBwd = this.input.isPressed("bwd");
-    const isLft = this.input.isPressed("lft");
-    const isRgt = this.input.isPressed("rgt");
+    // ✅ SUPPORT BOTH INPUT HANDLER + KEYBOARD
+    const isFwd =
+      this.input.isPressed("fwd") ||
+      this.keys["arrowup"] ||
+      this.keys["w"];
 
-    // 🔄 RESET
+    const isBwd =
+      this.input.isPressed("bwd") ||
+      this.keys["arrowdown"] ||
+      this.keys["s"];
+
+    const isLft =
+      this.input.isPressed("lft") ||
+      this.keys["arrowleft"] ||
+      this.keys["a"];
+
+    const isRgt =
+      this.input.isPressed("rgt") ||
+      this.keys["arrowright"] ||
+      this.keys["d"];
+
     if (this.input.isPressed("r")) {
       this.reset();
       return;
@@ -61,7 +85,7 @@ export class GameController {
 
     // ── SPEED ──
     if (!this.crashed || isFwd) {
-      if (isFwd) {
+      if (isFwd && !this.blockForward) {
         this.speed = Math.min(this.speed + this.ACCEL, this.MAX_SPEED);
       } else if (isBwd) {
         this.speed = Math.max(this.speed - this.ACCEL, -this.MAX_SPEED * 0.5);
@@ -73,21 +97,17 @@ export class GameController {
       this.speed *= 0.95;
     }
 
-    // ── COLLISION (AHEAD CHECK) ──
+    // ── COLLISION (BLOCK FORWARD) ──
     if (this.spawnSafeTime > 60) {
       for (const obs of this.obstacles) {
         if (!obs) continue;
 
         const dist = this.car.position.distanceTo(obs.position);
-
-        // only check nearby
         if (dist > 10) continue;
 
-        // check if obstacle is roughly in front
         if (obs.position.z < this.car.position.z) {
           const sideDiff = Math.abs(obs.position.x - this.car.position.x);
 
-          // 🚫 same lane & close → block forward
           if (sideDiff < 2 && dist < 3) {
             this.blockForward = true;
           }
@@ -99,19 +119,16 @@ export class GameController {
     if (!this.blockForward) {
       this.t += this.speed;
     } else {
-      // slight slowdown instead of passing through
       this.speed *= 0.9;
     }
 
-    // 🔁 LOOP ROAD
     if (this.t > 1) this.t = 0;
     if (this.t < 0) this.t = 0;
 
-    // ── STEERING (ALWAYS ALLOWED) ──
+    // ── STEERING ──
     if (isLft) this.lateralOffset += this.TURN_STRENGTH;
     if (isRgt) this.lateralOffset -= this.TURN_STRENGTH;
 
-    // ROAD LIMIT
     const limit = this.ROAD_WIDTH / 2 - 0.5;
 
     if (this.lateralOffset > limit) {
@@ -134,7 +151,6 @@ export class GameController {
     pos.y = 0.35;
 
     this.car.position.copy(pos);
-
     this.car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
   }
 
