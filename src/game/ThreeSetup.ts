@@ -17,23 +17,33 @@ export const initThreeGame = ({ mount }: any) => {
   );
   camera.position.set(0, 4, 10);
 
-  // ── RENDERER ─────────────────────────
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // ── RENDERER (OPTIMIZED) ─────────────
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,          // 🔥 off = faster
+    powerPreference: "high-performance",
+  });
+
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.shadowMap.enabled = true;
+
+  // 🔥 LIMIT pixel ratio (BIG performance win)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+
+  // 🔥 disable heavy shadows (you can enable later if needed)
+  renderer.shadowMap.enabled = false;
 
   mount.appendChild(renderer.domElement);
 
-  // ── LIGHTING ─────────────────────────
-  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  // ── LIGHTING (LIGHTWEIGHT) ───────────
+  const ambient = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambient);
 
-  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  const sun = new THREE.DirectionalLight(0xffffff, 1);
   sun.position.set(30, 60, 20);
-  sun.castShadow = true;
+
+  // 🔥 disable shadow casting (big boost)
+  sun.castShadow = false;
+
   scene.add(sun);
-  scene.add(sun.target);
 
   // ── WORLD (ROAD + TRAFFIC) ───────────
   const {
@@ -46,16 +56,22 @@ export const initThreeGame = ({ mount }: any) => {
   // ── CAR ──────────────────────────────
   const { car } = createCar(scene);
 
-  // initial car position (important!)
   const startPoint = curve.getPoint(0);
   car.position.copy(startPoint);
   car.position.y = 0.35;
 
-  // ── RESIZE HANDLER ───────────────────
+  // ── RESIZE HANDLER (OPTIMIZED) ───────
+  let resizeTimeout: any;
+
   const onResize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    clearTimeout(resizeTimeout);
+
+    resizeTimeout = setTimeout(() => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }, 100); // 🔥 debounce resize
   };
 
   window.addEventListener("resize", onResize);
@@ -71,7 +87,7 @@ export const initThreeGame = ({ mount }: any) => {
     renderer.dispose();
   };
 
-  // ── RETURN EVERYTHING ────────────────
+  // ── RETURN ───────────────────────────
   return {
     scene,
     camera,
@@ -79,8 +95,8 @@ export const initThreeGame = ({ mount }: any) => {
     car,
     curve,
     obstacles,
-    updateTraffic, // 🔥 VERY IMPORTANT
-    ROAD_WIDTH,    // 🔥 optional but useful
+    updateTraffic,
+    ROAD_WIDTH,
     cleanup,
   };
 };
