@@ -16,7 +16,6 @@ export default function GameScene() {
       camera,
       renderer,
       car,
-      curve,
       obstacles,
       updateTraffic,
       cleanup,
@@ -42,13 +41,7 @@ export default function GameScene() {
     // ── INPUT + CONTROLLER ─────────────
     const input = new InputHandler();
 
-    const controller = new GameController(
-      car,
-      curve,
-      obstacles,
-      input,
-      updateTraffic
-    );
+    const controller = new GameController(car, obstacles, input);
 
     // ── CAMERA HELPERS ─────────────────
     const camPos = new THREE.Vector3();
@@ -56,11 +49,18 @@ export default function GameScene() {
 
     // ── ANIMATION LOOP ─────────────────
     let animId: number;
+    let lastTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
-      controller.update();
+      const now = performance.now();
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+      const safeDelta = Math.min(delta, 0.033);
+
+      controller.update(safeDelta);
+      if (updateTraffic) updateTraffic();
 
       // 🚗 CAMERA FOLLOW (SMOOTH)
       const offset = new THREE.Vector3(0, 4, 10);

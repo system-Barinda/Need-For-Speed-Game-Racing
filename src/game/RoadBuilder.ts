@@ -10,7 +10,6 @@ export const buildRoads = (scene: THREE.Scene) => {
   const ROAD_WIDTH = LANE_WIDTH * LANES;
   const SEGMENTS = 400;
   const SHOULDER_WIDTH = 1.5;
-  const TOTAL_ROAD_WIDTH = ROAD_WIDTH + SHOULDER_WIDTH * 2;
 
   // ── MAIN CURVE ───────────────────────
   const points = [
@@ -245,7 +244,6 @@ export const buildRoads = (scene: THREE.Scene) => {
   for (let offset of [-0.15, 0.15]) {
     for (let i = 0; i < SEGMENTS - 1; i += 1) {
       const t = i / SEGMENTS;
-      const tNext = (i + 0.8) / SEGMENTS;
       const { point, tangent, normal } = getFrame(t);
       const p = point.clone().add(normal.clone().multiplyScalar(offset));
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 1.5), yellowMat);

@@ -10,7 +10,6 @@ export class GameController {
   private heading = 0;
   private steerAngle = 0;
 
-  private crashed = false;
   private spawnSafeTime = 0;
 
   // ── TUNING ──
