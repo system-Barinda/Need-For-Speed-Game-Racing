@@ -1,14 +1,39 @@
-export const startGameLoop = (update: (delta: number) => void) => {
-  let lastTime = 0;
+import * as THREE from "three";
 
-  const animate = (time: number) => {
-    const delta = (time - lastTime) / 1000;
-    lastTime = time;
+export const createGameLoop = ({
+  scene,
+  camera,
+  renderer,
+  controller, // your GameController
+}: any) => {
+  const clock = new THREE.Clock();
 
-    update(delta);
+  let running = true;
 
-    requestAnimationFrame(animate);
+  const loop = () => {
+    if (!running) return;
+
+    requestAnimationFrame(loop);
+
+    // ✅ Delta time (VERY IMPORTANT)
+    const delta = clock.getDelta();
+
+    // 🔥 Clamp delta (prevents lag spikes)
+    const safeDelta = Math.min(delta, 0.033); // ~30 FPS cap
+
+    // ── UPDATE GAME LOGIC ──
+    controller.update(safeDelta);
+
+    // ── RENDER ──
+    renderer.render(scene, camera);
   };
 
-  requestAnimationFrame(animate);
+  loop();
+
+  // ── STOP FUNCTION ──
+  const stop = () => {
+    running = false;
+  };
+
+  return { stop };
 };
