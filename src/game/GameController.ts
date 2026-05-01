@@ -10,6 +10,8 @@ export class GameController {
   private heading = 0;
   private steerAngle = 0;
 
+  private crashed = false;
+  private crashTimer = 0;
   private spawnSafeTime = 0;
 
   // ── TUNING ──
@@ -21,8 +23,7 @@ export class GameController {
   private readonly MAX_STEER = 0.6;
   private readonly STEER_SPEED = 3;
   private readonly STEER_RETURN = 2;
-
-  private keys: Record<string, boolean> = {};
+  private readonly CRASH_RECOVERY = 1.4;
 
   constructor(
     car: THREE.Object3D,
@@ -34,47 +35,43 @@ export class GameController {
     this.input = input;
 
     this.heading = car.rotation.y;
-
-    window.addEventListener(
-      'keydown',
-      (e) => (this.keys[e.key.toLowerCase()] = true)
-    );
-    window.addEventListener(
-      'keyup',
-      (e) => (this.keys[e.key.toLowerCase()] = false)
-    );
   }
 
   update(delta: number) {
     this.spawnSafeTime++;
 
-    const isFwd =
-      this.input.isPressed('fwd') || this.keys['w'] || this.keys['arrowup'];
-    const isBwd =
-      this.input.isPressed('bwd') || this.keys['s'] || this.keys['arrowdown'];
-    const isLft =
-      this.input.isPressed('lft') || this.keys['a'] || this.keys['arrowleft'];
-    const isRgt =
-      this.input.isPressed('rgt') || this.keys['d'] || this.keys['arrowright'];
+    const isFwd = this.input.isPressed('fwd');
+    const isBwd = this.input.isPressed('bwd');
+    const isLft = this.input.isPressed('lft');
+    const isRgt = this.input.isPressed('rgt');
 
-    // ── SPEED ──
     const forward = new THREE.Vector3(
       Math.sin(this.heading),
       0,
       -Math.cos(this.heading)
     );
 
-    if (isFwd) {
+    const speed = this.velocity.length();
+
+    if (isFwd && !this.crashed) {
       this.velocity.addScaledVector(forward, this.ACCEL * delta);
-    } else if (isBwd) {
-      this.velocity.addScaledVector(forward, -this.BRAKE * delta);
+    } else if (isBwd && !this.crashed) {
+      if (speed > 0.5) {
+        this.velocity.addScaledVector(forward, -this.BRAKE * delta);
+      } else {
+        this.velocity.addScaledVector(forward, -this.ACCEL * 0.6 * delta);
+      }
     } else {
-      this.velocity.multiplyScalar(1 - this.FRICTION * delta);
+      const drag = this.crashed ? this.FRICTION * 1.8 : this.FRICTION;
+      this.velocity.multiplyScalar(Math.max(0, 1 - drag * delta));
     }
 
-    // clamp speed
     if (this.velocity.length() > this.MAX_SPEED) {
       this.velocity.setLength(this.MAX_SPEED);
+    }
+
+    if (this.velocity.length() < 0.03) {
+      this.velocity.set(0, 0, 0);
     }
 
     // ── STEERING ──
@@ -89,36 +86,39 @@ export class GameController {
       this.steerAngle *= 1 - this.STEER_RETURN * delta;
     }
 
-    // ── TURN BASED ON SPEED ──
-    const speed = this.velocity.length();
-    const turnFactor = speed / this.MAX_SPEED;
-
-    this.heading += this.steerAngle * turnFactor * delta * 2;
+    const turnFactor = Math.min(speed / this.MAX_SPEED, 1);
+    const turnDirection = this.velocity.dot(forward) < 0 ? -1 : 1;
+    this.heading += this.steerAngle * turnFactor * delta * 2 * turnDirection;
 
     // ── APPLY MOVEMENT ──
     this.car.position.addScaledVector(this.velocity, delta);
 
-    // ── COLLISION (simple but fast) ──
     if (this.spawnSafeTime > 60) {
       for (const obs of this.obstacles) {
         if (!obs) continue;
 
         const dist = this.car.position.distanceTo(obs.position);
-        if (dist < 2.5) {
-          this.velocity.multiplyScalar(0.3);
+        if (dist < 2.5 && !this.crashed) {
+          this.velocity.multiplyScalar(-0.4);
           this.crashed = true;
+          this.crashTimer = 0;
+          break;
         }
       }
     }
 
-    // ── VISUAL ──
+    if (this.crashed) {
+      this.crashTimer += delta;
+      if (this.crashTimer > this.CRASH_RECOVERY && this.velocity.length() < 0.2) {
+        this.crashed = false;
+        this.crashTimer = 0;
+      }
+    }
+
     this.car.rotation.y = this.heading;
 
-    // body roll
     this.car.rotation.z +=
       (-this.steerAngle * 0.2 - this.car.rotation.z) * 5 * delta;
-
-    // keep upright
     this.car.rotation.x = 0;
   }
 }
