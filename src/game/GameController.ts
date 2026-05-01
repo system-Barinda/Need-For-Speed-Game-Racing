@@ -6,7 +6,7 @@ export class GameController {
   private input: InputHandler;
   private obstacles: THREE.Mesh[];
 
-  private velocity = new THREE.Vector3();
+  private speed = 0;
   private heading = 0;
   private steerAngle = 0;
 
@@ -15,14 +15,15 @@ export class GameController {
   private spawnSafeTime = 0;
 
   // ── TUNING ──
-  private readonly MAX_SPEED = 18;
-  private readonly ACCEL = 12;
-  private readonly BRAKE = 10;
-  private readonly FRICTION = 3;
+  private readonly MAX_SPEED = 20;
+  private readonly MAX_REVERSE = 8;
+  private readonly ACCEL = 18;
+  private readonly BRAKE = 20;
+  private readonly FRICTION = 4;
 
-  private readonly MAX_STEER = 0.6;
-  private readonly STEER_SPEED = 3;
-  private readonly STEER_RETURN = 2;
+  private readonly MAX_STEER = 0.7;
+  private readonly STEER_SPEED = 5;
+  private readonly STEER_RETURN = 3;
   private readonly CRASH_RECOVERY = 1.4;
 
   constructor(
@@ -35,6 +36,7 @@ export class GameController {
     this.input = input;
 
     this.heading = car.rotation.y;
+    console.info('[Game] GameController initialized. Use Arrow keys to drive.');
   }
 
   update(delta: number) {
@@ -51,30 +53,38 @@ export class GameController {
       -Math.cos(this.heading)
     );
 
-    const speed = this.velocity.length();
-
-    if (isFwd && !this.crashed) {
-      this.velocity.addScaledVector(forward, this.ACCEL * delta);
-    } else if (isBwd && !this.crashed) {
-      if (speed > 0.5) {
-        this.velocity.addScaledVector(forward, -this.BRAKE * delta);
+    if (!this.crashed) {
+      if (isFwd) {
+        if (this.speed < 0) {
+          this.speed += this.BRAKE * delta;
+        } else {
+          this.speed += this.ACCEL * delta;
+        }
+      } else if (isBwd) {
+        if (this.speed > 0) {
+          this.speed -= this.BRAKE * delta;
+        } else {
+          this.speed -= this.ACCEL * 0.8 * delta;
+        }
       } else {
-        this.velocity.addScaledVector(forward, -this.ACCEL * 0.6 * delta);
+        if (this.speed > 0) {
+          this.speed = Math.max(0, this.speed - this.FRICTION * delta);
+        } else {
+          this.speed = Math.min(0, this.speed + this.FRICTION * delta);
+        }
       }
     } else {
-      const drag = this.crashed ? this.FRICTION * 1.8 : this.FRICTION;
-      this.velocity.multiplyScalar(Math.max(0, 1 - drag * delta));
+      if (this.speed > 0) {
+        this.speed = Math.max(0, this.speed - this.FRICTION * 2 * delta);
+      } else {
+        this.speed = Math.min(0, this.speed + this.FRICTION * 2 * delta);
+      }
     }
 
-    if (this.velocity.length() > this.MAX_SPEED) {
-      this.velocity.setLength(this.MAX_SPEED);
-    }
+    if (this.speed > this.MAX_SPEED) this.speed = this.MAX_SPEED;
+    if (this.speed < -this.MAX_REVERSE) this.speed = -this.MAX_REVERSE;
+    if (Math.abs(this.speed) < 0.035) this.speed = 0;
 
-    if (this.velocity.length() < 0.03) {
-      this.velocity.set(0, 0, 0);
-    }
-
-    // ── STEERING ──
     let steerTarget = 0;
     if (isLft) steerTarget = this.MAX_STEER;
     if (isRgt) steerTarget = -this.MAX_STEER;
@@ -86,12 +96,15 @@ export class GameController {
       this.steerAngle *= 1 - this.STEER_RETURN * delta;
     }
 
-    const turnFactor = Math.min(speed / this.MAX_SPEED, 1);
-    const turnDirection = this.velocity.dot(forward) < 0 ? -1 : 1;
-    this.heading += this.steerAngle * turnFactor * delta * 2 * turnDirection;
+    const speedFactor = Math.max(
+      0.2,
+      Math.min(Math.abs(this.speed) / this.MAX_SPEED, 1)
+    );
+    const direction = this.speed >= 0 ? 1 : -1;
+    this.heading += this.steerAngle * speedFactor * delta * 1.8 * direction;
 
-    // ── APPLY MOVEMENT ──
-    this.car.position.addScaledVector(this.velocity, delta);
+    const movement = forward.clone().multiplyScalar(this.speed * delta);
+    this.car.position.add(movement);
 
     if (this.spawnSafeTime > 60) {
       for (const obs of this.obstacles) {
@@ -99,7 +112,7 @@ export class GameController {
 
         const dist = this.car.position.distanceTo(obs.position);
         if (dist < 2.5 && !this.crashed) {
-          this.velocity.multiplyScalar(-0.4);
+          this.speed *= -0.35;
           this.crashed = true;
           this.crashTimer = 0;
           break;
@@ -109,14 +122,13 @@ export class GameController {
 
     if (this.crashed) {
       this.crashTimer += delta;
-      if (this.crashTimer > this.CRASH_RECOVERY && this.velocity.length() < 0.2) {
+      if (this.crashTimer > this.CRASH_RECOVERY && Math.abs(this.speed) < 0.2) {
         this.crashed = false;
         this.crashTimer = 0;
       }
     }
 
     this.car.rotation.y = this.heading;
-
     this.car.rotation.z +=
       (-this.steerAngle * 0.2 - this.car.rotation.z) * 5 * delta;
     this.car.rotation.x = 0;
