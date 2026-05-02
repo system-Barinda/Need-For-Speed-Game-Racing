@@ -14,19 +14,19 @@ export class UISystem {
   private gameStateManager: GameStateManager;
 
   // HUD elements
-  private hudContainer: HTMLElement;
-  private speedDisplay: HTMLElement;
-  private scoreDisplay: HTMLElement;
-  private distanceDisplay: HTMLElement;
-  private timeDisplay: HTMLElement;
-  private levelDisplay: HTMLElement;
-  private miniMap: HTMLElement;
+  private hudContainer!: HTMLElement;
+  private speedDisplay!: HTMLElement;
+  private scoreDisplay!: HTMLElement;
+  private distanceDisplay!: HTMLElement;
+  private timeDisplay!: HTMLElement;
+  private levelDisplay!: HTMLElement;
+  private miniMap!: HTMLElement;
 
   // Menu elements
-  private mainMenu: HTMLElement;
-  private pauseMenu: HTMLElement;
-  private gameOverMenu: HTMLElement;
-  private levelCompleteMenu: HTMLElement;
+  private mainMenu!: HTMLElement;
+  private pauseMenu!: HTMLElement;
+  private gameOverMenu!: HTMLElement;
+  private levelCompleteMenu!: HTMLElement;
 
   // Settings
   private showHUD = true;
@@ -232,7 +232,6 @@ export class UISystem {
   // Update methods
   update(_deltaTime: number) {
     const stats = this.gameStateManager.getStats();
-    const _state = this.gameStateManager.getState();
 
     this.updateHUD(stats);
     this.updateVisibility();

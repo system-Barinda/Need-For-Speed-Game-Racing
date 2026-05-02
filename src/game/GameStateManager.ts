@@ -1,4 +1,5 @@
-import { GameState, Difficulty, GameStats, LevelConfig } from './types';
+import { GameState, Difficulty } from './types';
+import type { GameStats, LevelConfig } from './types';
 import { PhysicsSystem } from './PhysicsSystem';
 import { TrafficSystem } from './TrafficSystem';
 
@@ -23,6 +24,8 @@ export  class GameStateManager {
   private trafficSystem: TrafficSystem | null = null;
 
   // Game timing
+  private gameStartTime = 0;
+  private levelStartTime = 0;
   private pauseStartTime = 0;
   private totalPauseTime = 0;
 
@@ -381,7 +384,9 @@ export  class GameStateManager {
       stats: this.stats,
       levelProgress: (this.stats.distance / this.currentLevel.targetDistance * 100).toFixed(1) + '%',
       timeRemaining: this.currentLevel.timeLimit ?
-        Math.max(0, this.currentLevel.timeLimit - this.stats.time).toFixed(1) + 's' : '∞'
+        Math.max(0, this.currentLevel.timeLimit - this.stats.time).toFixed(1) + 's' : '∞',
+      gameStartTime: this.gameStartTime ? `${((performance.now() - this.gameStartTime) / 1000).toFixed(1)}s` : 'not started',
+      levelStartTime: this.levelStartTime ? new Date(this.levelStartTime).toISOString() : 'not started'
     };
   }
 }
