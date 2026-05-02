@@ -4,7 +4,7 @@ export const createCar = (scene: THREE.Scene) => {
   const car = new THREE.Group();
   scene.add(car);
 
-  // MATERIALS
+  // ================= MATERIALS =================
   const bodyMat = new THREE.MeshStandardMaterial({
     color: 0xff2a2a,
     roughness: 0.4,
@@ -30,20 +30,17 @@ export const createCar = (scene: THREE.Scene) => {
     roughness: 0.2,
   });
 
-  // ── LOWER BODY ───────────────────────
+  // ================= BODY =================
   const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 4.2), bodyMat);
   lowerBody.position.y = 0.4;
-
   lowerBody.castShadow = true;
   car.add(lowerBody);
 
-  // ── CABIN ────────────────────────────
   const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2.2), bodyMat);
   cabin.position.set(0, 0.95, -0.2);
-  cabin.castShadow = true;
   car.add(cabin);
 
-  // ── WINDSHIELD (FRONT) ───────────────
+  // ================= GLASS =================
   const windshield = new THREE.Mesh(
     new THREE.PlaneGeometry(1.5, 0.5),
     glassMat
@@ -52,37 +49,25 @@ export const createCar = (scene: THREE.Scene) => {
   windshield.rotation.x = -Math.PI * 0.2;
   car.add(windshield);
 
-  // ── REAR WINDOW ──────────────────────
-  const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.5), glassMat);
+  const rearGlass = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 0.5),
+    glassMat
+  );
   rearGlass.position.set(0, 0.95, -1.3);
   rearGlass.rotation.x = Math.PI * 0.2;
   car.add(rearGlass);
 
-  // ── SIDE WINDOWS ─────────────────────
   [-0.9, 0.9].forEach((x) => {
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.45), glassMat);
+    const side = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 0.45),
+      glassMat
+    );
     side.position.set(x, 0.95, -0.2);
     side.rotation.y = Math.PI / 2;
     car.add(side);
   });
 
-  // ── FRONT BUMPER ─────────────────────
-  const bumper = new THREE.Mesh(
-    new THREE.BoxGeometry(2.1, 0.2, 0.15),
-    chromeMat
-  );
-  bumper.position.set(0, 0.2, 2.15);
-  car.add(bumper);
-
-  // ── GRILLE ───────────────────────────
-  const grille = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2, 0.25, 0.05),
-    darkMat
-  );
-  grille.position.set(0, 0.4, 2.2);
-  car.add(grille);
-
-  // ── HEADLIGHTS ───────────────────────
+  // ================= LIGHTS =================
   const headMat = new THREE.MeshStandardMaterial({
     color: 0xffffcc,
     emissive: new THREE.Color(0xffffaa),
@@ -98,7 +83,6 @@ export const createCar = (scene: THREE.Scene) => {
     car.add(light);
   });
 
-  // ── TAILLIGHTS ───────────────────────
   const tailMat = new THREE.MeshStandardMaterial({
     color: 0xff2200,
     emissive: new THREE.Color(0xff0000),
@@ -114,7 +98,7 @@ export const createCar = (scene: THREE.Scene) => {
     car.add(light);
   });
 
-  // ── WHEELS ───────────────────────────
+  // ================= WHEELS =================
   const tires: THREE.Mesh[] = [];
 
   const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 20);
@@ -132,7 +116,6 @@ export const createCar = (scene: THREE.Scene) => {
 
     const tire = new THREE.Mesh(wheelGeo, darkMat);
     tire.rotation.z = Math.PI / 2;
-    tire.castShadow = true;
     group.add(tire);
 
     const hub = new THREE.Mesh(hubGeo, chromeMat);
@@ -145,11 +128,36 @@ export const createCar = (scene: THREE.Scene) => {
     tires.push(tire);
   });
 
-  car.position.set(0, 0, 0);
+  // ================= LANE SYSTEM (FIX) =================
+  const lanes = [-2, 0, 2]; // MUST match your road
+  let currentLane = 1;
+  let targetX = lanes[currentLane];
+
+  const moveLeft = () => {
+    currentLane = Math.max(0, currentLane - 1);
+    targetX = lanes[currentLane];
+  };
+
+  const moveRight = () => {
+    currentLane = Math.min(lanes.length - 1, currentLane + 1);
+    targetX = lanes[currentLane];
+  };
+
+  const update = () => {
+    // smooth movement to lane
+    car.position.x += (targetX - car.position.x) * 0.15;
+  };
+
+  // initial position
+  car.position.set(lanes[currentLane], 0, 0);
 
   return {
     car,
-    carBody: lowerBody,
     tires,
+
+    // 🔥 IMPORTANT (used in GameController)
+    moveLeft,
+    moveRight,
+    update,
   };
 };
