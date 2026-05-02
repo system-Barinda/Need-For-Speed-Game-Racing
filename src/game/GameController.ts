@@ -7,8 +7,11 @@ export class GameController {
   private obstacles: THREE.Mesh[];
 
   private speed = 0;
-  private heading = 0;
-  private steerAngle = 0;
+
+  // ✅ LANE SYSTEM
+  private lanes = [-2, 0, 2];
+  private currentLane = 1;
+  private targetX = this.lanes[this.currentLane];
 
   private crashed = false;
   private crashTimer = 0;
@@ -21,9 +24,6 @@ export class GameController {
   private readonly BRAKE = 20;
   private readonly FRICTION = 4;
 
-  private readonly MAX_STEER = 0.7;
-  private readonly STEER_SPEED = 5;
-  private readonly STEER_RETURN = 3;
   private readonly CRASH_RECOVERY = 1.4;
 
   constructor(
@@ -35,8 +35,10 @@ export class GameController {
     this.obstacles = obstacles;
     this.input = input;
 
-    this.heading = car.rotation.y;
-    console.info('[Game] GameController initialized. Use Arrow keys to drive.');
+    // start in middle lane
+    this.car.position.x = this.targetX;
+
+    console.info('[Game] Controller ready (lane-based)');
   }
 
   update(delta: number) {
@@ -47,12 +49,7 @@ export class GameController {
     const isLft = this.input.isPressed('lft');
     const isRgt = this.input.isPressed('rgt');
 
-    const forward = new THREE.Vector3(
-      Math.sin(this.heading),
-      0,
-      -Math.cos(this.heading)
-    );
-
+    // ================= SPEED =================
     if (!this.crashed) {
       if (isFwd) {
         if (this.speed < 0) {
@@ -74,45 +71,44 @@ export class GameController {
         }
       }
     } else {
-      if (this.speed > 0) {
-        this.speed = Math.max(0, this.speed - this.FRICTION * 2 * delta);
-      } else {
-        this.speed = Math.min(0, this.speed + this.FRICTION * 2 * delta);
-      }
+      this.speed *= 0.96;
     }
 
+    // clamp speed
     if (this.speed > this.MAX_SPEED) this.speed = this.MAX_SPEED;
     if (this.speed < -this.MAX_REVERSE) this.speed = -this.MAX_REVERSE;
-    if (Math.abs(this.speed) < 0.035) this.speed = 0;
+    if (Math.abs(this.speed) < 0.05) this.speed = 0;
 
-    let steerTarget = 0;
-    if (isLft) steerTarget = this.MAX_STEER;
-    if (isRgt) steerTarget = -this.MAX_STEER;
-
-    if (steerTarget !== 0) {
-      this.steerAngle +=
-        (steerTarget - this.steerAngle) * this.STEER_SPEED * delta;
-    } else {
-      this.steerAngle *= 1 - this.STEER_RETURN * delta;
+    // ================= LANE CHANGE =================
+    // trigger once (avoid skipping lanes fast)
+    if (isLft) {
+      this.currentLane = Math.max(0, this.currentLane - 1);
+      this.targetX = this.lanes[this.currentLane];
     }
 
-    const speedFactor = Math.max(
-      0.2,
-      Math.min(Math.abs(this.speed) / this.MAX_SPEED, 1)
-    );
-    const direction = this.speed >= 0 ? 1 : -1;
-    this.heading += this.steerAngle * speedFactor * delta * 1.8 * direction;
+    if (isRgt) {
+      this.currentLane = Math.min(
+        this.lanes.length - 1,
+        this.currentLane + 1
+      );
+      this.targetX = this.lanes[this.currentLane];
+    }
 
-    const movement = forward.clone().multiplyScalar(this.speed * delta);
-    this.car.position.add(movement);
+    // smooth move to lane
+    this.car.position.x += (this.targetX - this.car.position.x) * 0.15;
 
+    // ================= FORWARD MOVEMENT =================
+    this.car.position.z -= this.speed * delta;
+
+    // ================= COLLISION =================
     if (this.spawnSafeTime > 60) {
       for (const obs of this.obstacles) {
         if (!obs) continue;
 
         const dist = this.car.position.distanceTo(obs.position);
+
         if (dist < 2.5 && !this.crashed) {
-          this.speed *= -0.35;
+          this.speed *= -0.3;
           this.crashed = true;
           this.crashTimer = 0;
           break;
@@ -122,15 +118,19 @@ export class GameController {
 
     if (this.crashed) {
       this.crashTimer += delta;
-      if (this.crashTimer > this.CRASH_RECOVERY && Math.abs(this.speed) < 0.2) {
+
+      if (this.crashTimer > this.CRASH_RECOVERY) {
         this.crashed = false;
         this.crashTimer = 0;
       }
     }
 
-    this.car.rotation.y = this.heading;
-    this.car.rotation.z +=
-      (-this.steerAngle * 0.2 - this.car.rotation.z) * 5 * delta;
+    // ================= VISUAL TILT =================
+    const tilt = (this.targetX - this.car.position.x) * 0.3;
+    this.car.rotation.z = -tilt;
+
+    // keep car straight forward
+    this.car.rotation.y = 0;
     this.car.rotation.x = 0;
   }
 }
