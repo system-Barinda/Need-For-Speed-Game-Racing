@@ -42,6 +42,7 @@ export const initThreeGame = ({ mount }: { mount: HTMLElement }) => {
   const {
     obstacles,
     curve,
+    trafficSystem,
     updateTraffic,
     ROAD_WIDTH,
   } = buildRoads(scene);
@@ -139,6 +140,7 @@ export const initThreeGame = ({ mount }: { mount: HTMLElement }) => {
     car,
     curve,
     obstacles,
+    trafficSystem,
     updateTraffic,
     ROAD_WIDTH,
     cleanup,

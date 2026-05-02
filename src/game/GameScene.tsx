@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { initThreeGame } from './ThreeSetup';
 import { InputHandler } from './InputHandler';
 import { GameController } from './GameController';
+import { GameStateManager } from './GameStateManager';
+import { UISystem } from './UISystem';
 
 export default function GameScene() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -17,6 +19,7 @@ export default function GameScene() {
       renderer,
       car,
       obstacles,
+      trafficSystem,
       updateTraffic,
       cleanup,
     } = initThreeGame({ mount: mountRef.current });
@@ -36,9 +39,15 @@ export default function GameScene() {
     setSize();
     window.addEventListener('resize', setSize);
 
-    // ── INPUT + CONTROLLER ─────────────
+    // ── SYSTEMS INITIALIZATION ─────────
     const input = new InputHandler();
     const controller = new GameController(car, obstacles, input);
+    const gameStateManager = new GameStateManager();
+    const uiSystem = new UISystem(mountRef.current, gameStateManager);
+
+    // Connect systems
+    gameStateManager.setPhysicsSystem(controller.physicsSystem);
+    gameStateManager.setTrafficSystem(trafficSystem);
 
     // ── CAMERA HELPERS (REUSED OBJECTS) ─
     const camPos = new THREE.Vector3();
@@ -63,8 +72,13 @@ export default function GameScene() {
 
       const safeDelta = Math.min(delta, 0.033);
 
+      // Update game systems
+      gameStateManager.update(safeDelta);
       controller.update(safeDelta);
-      updateTraffic?.();
+      updateTraffic?.(car.position);
+
+      // Update UI
+      uiSystem.update(safeDelta);
 
       // ── CAMERA FOLLOW (STABLE + SMOOTH) ─
       tempVec.copy(offset);
@@ -95,6 +109,7 @@ export default function GameScene() {
     return () => {
       cancelAnimationFrame(animId);
       input.destroy();
+      uiSystem.destroy();
       cleanup();
       window.removeEventListener('resize', setSize);
     };

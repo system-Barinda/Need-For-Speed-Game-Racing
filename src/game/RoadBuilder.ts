@@ -664,34 +664,51 @@ export const buildRoads = (scene: THREE.Scene) => {
     }
   }
 
-  // ── UPDATE AI TRAFFIC ─────────────────
-  // (called externally each frame)
-  const updateTraffic = () => {
-    for (const car of trafficCars) {
-      car.t += car.speed;
-      if (car.t > 1) car.t = 0.05;
+  // ── INITIALIZE TRAFFIC SYSTEM ───────
+  const trafficSystem = new TrafficSystem(scene, curve, LANES, LANE_WIDTH, ROAD_WIDTH);
 
-      const t = car.t;
-      const { point, tangent, normal } = getFrame(t);
+  // Create initial traffic cars
+  const initialTrafficCars: any[] = [];
+  for (let i = 20; i < SEGMENTS - 10; i += 22) {
+    const t = i / SEGMENTS;
+    const laneIndex = Math.floor(Math.random() * LANES);
+    const color = carColors[Math.floor(Math.random() * carColors.length)];
 
-      const laneOffset = -ROAD_WIDTH / 2 + (car.lane + 0.5) * LANE_WIDTH;
-      const pos = point.clone().add(normal.clone().multiplyScalar(laneOffset));
-      pos.y = 0.35;
+    const carGroup = buildCar(color);
+    scene.add(carGroup);
 
-      car.mesh.position.copy(pos);
-      car.proxy.position.copy(pos);
+    const proxy = new THREE.Mesh(
+      new THREE.BoxGeometry(2.0, 1.2, 4.2),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    scene.add(proxy);
+    obstacles.push(proxy);
 
-      // Face direction of travel
-      const lookTarget = pos.clone().add(tangent);
-      car.mesh.lookAt(lookTarget);
-      car.proxy.lookAt(lookTarget);
-    }
+    initialTrafficCars.push({
+      mesh: carGroup,
+      proxy,
+      t,
+      speed: 0.0004 + Math.random() * 0.0006,
+      lane: laneIndex,
+      targetLane: laneIndex,
+      laneChangeProgress: 1,
+      color
+    });
+  }
+
+  trafficSystem.initializeTraffic(initialTrafficCars);
+
+  // Legacy update function for backward compatibility
+  const updateTraffic = (playerPosition?: THREE.Vector3) => {
+    const pos = playerPosition || new THREE.Vector3(0, 0, 0);
+    trafficSystem.update(1/60, pos); // Assume 60 FPS delta
   };
 
   return {
     obstacles,
     curve,
-    trafficCars,
+    trafficCars: trafficSystem.getTrafficCars(),
+    trafficSystem,
     LANES,
     LANE_WIDTH,
     ROAD_WIDTH,

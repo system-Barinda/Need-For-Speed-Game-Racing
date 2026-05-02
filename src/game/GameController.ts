@@ -5,7 +5,7 @@ import { PhysicsSystem } from './PhysicsSystem';
 // Legacy GameController - now acts as a bridge to PhysicsSystem
 // This maintains backward compatibility while delegating to the new system
 export class GameController {
-  private physicsSystem: PhysicsSystem;
+  public physicsSystem: PhysicsSystem;
 
   constructor(
     car: THREE.Object3D,

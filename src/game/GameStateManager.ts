@@ -1,41 +1,6 @@
-import * as THREE from 'three';
+import { GameState, Difficulty, GameStats, LevelConfig } from './types';
 import { PhysicsSystem } from './PhysicsSystem';
 import { TrafficSystem } from './TrafficSystem';
-
-export enum GameState {
-  MENU = 'menu',
-  PLAYING = 'playing',
-  PAUSED = 'paused',
-  GAME_OVER = 'game_over',
-  LEVEL_COMPLETE = 'level_complete'
-}
-
-export enum Difficulty {
-  EASY = 'easy',
-  MEDIUM = 'medium',
-  HARD = 'hard'
-}
-
-export interface GameStats {
-  score: number;
-  distance: number;
-  time: number;
-  crashes: number;
-  level: number;
-  speed: number;
-  lane: number;
-}
-
-export interface LevelConfig {
-  id: number;
-  name: string;
-  difficulty: Difficulty;
-  targetDistance: number;
-  timeLimit?: number;
-  trafficDensity: number;
-  maxSpeed: number;
-  description: string;
-}
 
 export class GameStateManager {
   private currentState: GameState = GameState.MENU;
@@ -58,8 +23,6 @@ export class GameStateManager {
   private trafficSystem: TrafficSystem | null = null;
 
   // Game timing
-  private gameStartTime = 0;
-  private levelStartTime = 0;
   private pauseStartTime = 0;
   private totalPauseTime = 0;
 
