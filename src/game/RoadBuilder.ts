@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TrafficSystem } from './TrafficSystem';
 
 export const buildRoads = (scene: THREE.Scene) => {
   const obstacles: THREE.Mesh[] = [];
@@ -550,33 +551,6 @@ export const buildRoads = (scene: THREE.Scene) => {
 
     return group;
   };
-
-  // Spawn traffic cars
-  for (let i = 20; i < SEGMENTS - 10; i += 22) {
-    const t = i / SEGMENTS;
-    const laneIndex = Math.floor(Math.random() * LANES);
-    const color = carColors[Math.floor(Math.random() * carColors.length)];
-
-    const carGroup = buildCar(color);
-    scene.add(carGroup);
-
-    // For obstacle collision we use a proxy mesh
-    const proxy = new THREE.Mesh(
-      new THREE.BoxGeometry(2.0, 1.2, 4.2),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    scene.add(proxy);
-    obstacles.push(proxy);
-
-    trafficCars.push({
-      mesh: carGroup,
-      proxy,
-      t,
-      speed: 0.0004 + Math.random() * 0.0006,
-      lane: laneIndex,
-      targetLane: laneIndex,
-    });
-  }
 
   // ── 🏠 HOUSES ────────────────────────
   const buildHouse = (position: THREE.Vector3) => {
