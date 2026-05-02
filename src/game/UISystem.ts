@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { GameStateManager, GameState, GameStats } from './GameStateManager';
+import { GameStateManager } from './GameStateManager';
+import { GameState, type GameStats } from './types';
 
 export interface UIElement {
   id: string;
@@ -230,9 +230,9 @@ export class UISystem {
   }
 
   // Update methods
-  update(deltaTime: number) {
+  update(_deltaTime: number) {
     const stats = this.gameStateManager.getStats();
-    const state = this.gameStateManager.getState();
+    const _state = this.gameStateManager.getState();
 
     this.updateHUD(stats);
     this.updateVisibility();

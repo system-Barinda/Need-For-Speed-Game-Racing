@@ -1,4 +1,4 @@
-export enum GameState {
+export  enum GameState {
   MENU = 'menu',
   PLAYING = 'playing',
   PAUSED = 'paused',

@@ -3,7 +3,6 @@ import { TrafficSystem } from './TrafficSystem';
 
 export const buildRoads = (scene: THREE.Scene) => {
   const obstacles: THREE.Mesh[] = [];
-  const trafficCars: any[] = [];
 
   // ── SETTINGS ─────────────────────────
   const LANE_WIDTH = 3.5;

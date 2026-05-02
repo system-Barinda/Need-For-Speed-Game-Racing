@@ -24,7 +24,6 @@ export class TrafficSystem {
   private readonly MAX_SPEED = 0.0008;
   private readonly LANE_CHANGE_DURATION = 1.0;
   private readonly MIN_DISTANCE_BETWEEN_CARS = 15;
-  private readonly CAR_SPAWN_DISTANCE = 50;
 
   // Lane change system
   private laneChangeQueue: TrafficCar[] = [];
@@ -296,7 +295,7 @@ export class TrafficSystem {
     return this.trafficCars.map(car => car.proxy);
   }
 
-  setTrafficDensity(density: number) {
+  setTrafficDensity(_density: number) {
     // Adjust spawn rates based on density (0-1)
     // Implementation for dynamic traffic density
   }

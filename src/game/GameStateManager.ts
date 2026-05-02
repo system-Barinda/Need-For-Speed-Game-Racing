@@ -2,7 +2,7 @@ import { GameState, Difficulty, GameStats, LevelConfig } from './types';
 import { PhysicsSystem } from './PhysicsSystem';
 import { TrafficSystem } from './TrafficSystem';
 
-export class GameStateManager {
+export  class GameStateManager {
   private currentState: GameState = GameState.MENU;
   private difficulty: Difficulty = Difficulty.MEDIUM;
   private currentLevel: LevelConfig;
