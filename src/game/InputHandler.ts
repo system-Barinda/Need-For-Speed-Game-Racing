@@ -1,13 +1,16 @@
 export class InputHandler {
   private keys = new Set<string>();
+  private justPressed = new Set<string>();
 
   constructor() {
     window.addEventListener('keydown', this.onKeyDown, { passive: false });
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
-    console.info('[Game] InputHandler enabled. Use Arrow keys to drive.');
+
+    console.info('[Game] InputHandler ready');
   }
 
+  // ================= KEY NORMALIZATION =================
   private normalizeKey(key: string): string {
     switch (key) {
       case 'ArrowUp':
@@ -43,26 +46,22 @@ export class InputHandler {
     }
   }
 
+  // ================= EVENTS =================
   private onKeyDown = (e: KeyboardEvent) => {
-    // 🚫 prevent browser scrolling
     if (
-      [
-        'ArrowUp',
-        'ArrowDown',
-        'ArrowLeft',
-        'ArrowRight',
-        ' ',
-        'Space',
-      ].includes(e.key)
+      ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Space'].includes(
+        e.key
+      )
     ) {
       e.preventDefault();
     }
 
     const key = this.normalizeKey(e.key);
 
-    // avoid adding duplicates (important for smooth control)
+    // ✅ detect first press only
     if (!this.keys.has(key)) {
       this.keys.add(key);
+      this.justPressed.add(key); // 🔥 IMPORTANT
     }
   };
 
@@ -73,16 +72,32 @@ export class InputHandler {
 
   private onBlur = () => {
     this.keys.clear();
+    this.justPressed.clear();
   };
 
+  // ================= API =================
+
+  // hold key
   isPressed(key: string) {
     return this.keys.has(key);
+  }
+
+  // 🔥 tap once (use for lane switching)
+  isJustPressed(key: string) {
+    return this.justPressed.has(key);
+  }
+
+  // 🔥 MUST call this every frame (in GameLoop)
+  update() {
+    this.justPressed.clear();
   }
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
+
     this.keys.clear();
+    this.justPressed.clear();
   }
 }
