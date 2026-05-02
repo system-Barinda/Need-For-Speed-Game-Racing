@@ -66,45 +66,6 @@ export const initThreeGame = ({ mount }: { mount: HTMLElement }) => {
 
   setCarOnRoad();
 
-  // ── CAMERA FOLLOW (SMOOTH) ───────────
-  const cameraOffset = new THREE.Vector3(0, 4, 10);
-
-  const updateCamera = () => {
-    const desiredPosition = car.position.clone().add(
-      cameraOffset.clone().applyAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        car.rotation.y
-      )
-    );
-
-    // smooth follow
-    camera.position.lerp(desiredPosition, 0.1);
-
-    camera.lookAt(car.position);
-  };
-
-  // ── GAME LOOP ────────────────────────
-  const clock = new THREE.Clock();
-
-  const animate = () => {
-    requestAnimationFrame(animate);
-
-    const delta = clock.getDelta();
-
-    // 🚗 move player forward automatically (you can control later)
-    playerT += delta * 0.05;
-    if (playerT > 1) playerT = 0;
-
-    setCarOnRoad();
-
-    updateTraffic();
-    updateCamera();
-
-    renderer.render(scene, camera);
-  };
-
-  animate();
-
   // ── RESIZE HANDLER ───────────────────
   let resizeTimeout: number;
 

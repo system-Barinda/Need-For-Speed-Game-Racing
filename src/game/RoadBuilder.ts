@@ -698,9 +698,8 @@ export const buildRoads = (scene: THREE.Scene) => {
   trafficSystem.initializeTraffic(initialTrafficCars);
 
   // Legacy update function for backward compatibility
-  const updateTraffic = (playerPosition?: THREE.Vector3) => {
-    const pos = playerPosition || new THREE.Vector3(0, 0, 0);
-    trafficSystem.update(1/60, pos); // Assume 60 FPS delta
+  const updateTraffic = (deltaTime: number = 1 / 60, playerPosition: THREE.Vector3 = new THREE.Vector3(0, 0, 0)) => {
+    trafficSystem.update(deltaTime, playerPosition);
   };
 
   return {

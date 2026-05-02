@@ -75,7 +75,7 @@ export default function GameScene() {
       // Update game systems
       gameStateManager.update(safeDelta);
       controller.update(safeDelta);
-      updateTraffic?.(car.position);
+      updateTraffic?.(safeDelta, car.position);
 
       // Update UI
       uiSystem.update(safeDelta);
