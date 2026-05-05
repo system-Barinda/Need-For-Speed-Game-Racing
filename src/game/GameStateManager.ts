@@ -27,6 +27,7 @@ export class GameStateManager {
   private gameStartTime = 0;
   private levelStartTime = 0;
   private pauseStartTime = 0;
+  private isGameStarting = false;
 
   // Level configurations
   private levels: LevelConfig[] = [
@@ -78,8 +79,13 @@ export class GameStateManager {
   // State management
   setState(newState: GameState) {
     const oldState = this.currentState;
+    
+    // Prevent unnecessary state changes
+    if (oldState === newState && newState !== GameState.MENU) {
+      return;
+    }
+    
     this.currentState = newState;
-
     console.info(`[GameStateManager] State changed: ${oldState} -> ${newState}`);
 
     switch (newState) {
@@ -94,6 +100,9 @@ export class GameStateManager {
         break;
       case GameState.LEVEL_COMPLETE:
         this.onLevelComplete();
+        break;
+      case GameState.MENU:
+        this.onMenuEnter();
         break;
     }
   }
@@ -150,7 +159,14 @@ export class GameStateManager {
 
   // Update loop
   update(deltaTime: number) {
+    // Only update game logic when playing
     if (this.currentState !== GameState.PLAYING) return;
+    
+    // Skip update if game is just starting (prevent weird frame)
+    if (this.isGameStarting) {
+      this.isGameStarting = false;
+      return;
+    }
 
     // Update game time
     this.stats.time += deltaTime;
@@ -167,6 +183,7 @@ export class GameStateManager {
       if (this.physicsSystem.isCrashed() && !this.wasCrashed) {
         this.stats.crashes++;
         this.wasCrashed = true;
+        console.log(`[GameStateManager] Crash detected! Total crashes: ${this.stats.crashes}`);
       } else if (!this.physicsSystem.isCrashed()) {
         this.wasCrashed = false;
       }
@@ -204,18 +221,21 @@ export class GameStateManager {
   private checkGameConditions() {
     // Check distance goal
     if (this.stats.distance >= this.currentLevel.targetDistance) {
+      console.log('[GameStateManager] Level complete! Distance goal reached');
       this.setState(GameState.LEVEL_COMPLETE);
       return;
     }
 
     // Check time limit
     if (this.currentLevel.timeLimit && this.stats.time >= this.currentLevel.timeLimit) {
+      console.log('[GameStateManager] Game over! Time limit exceeded');
       this.setState(GameState.GAME_OVER);
       return;
     }
 
     // Check excessive crashes
     if (this.stats.crashes >= 5) {
+      console.log('[GameStateManager] Game over! Too many crashes');
       this.setState(GameState.GAME_OVER);
       return;
     }
@@ -223,22 +243,29 @@ export class GameStateManager {
 
   // Event handlers
   private onGameStart() {
+    console.log('[GameStateManager] onGameStart called');
     this.gameStartTime = performance.now();
     this.levelStartTime = performance.now();
+    this.isGameStarting = true;
 
-    // Apply level settings
+    // Apply level settings to physics
     if (this.physicsSystem) {
       this.physicsSystem.setMaxSpeed(this.currentLevel.maxSpeed);
+      console.log(`[GameStateManager] Max speed set to: ${this.currentLevel.maxSpeed}`);
     }
 
+    // Apply traffic density
     if (this.trafficSystem) {
       this.trafficSystem.setTrafficDensity(this.currentLevel.trafficDensity);
+      this.trafficSystem.resumeTraffic();
+      console.log(`[GameStateManager] Traffic density set to: ${this.currentLevel.trafficDensity}`);
     }
 
     console.info(`[GameStateManager] Game started - Level ${this.currentLevel.id}: ${this.currentLevel.name}`);
   }
 
   private onGamePause() {
+    console.log('[GameStateManager] Game paused');
     this.pauseStartTime = performance.now();
 
     if (this.trafficSystem) {
@@ -247,7 +274,12 @@ export class GameStateManager {
   }
 
   private onGameResume() {
+    console.log('[GameStateManager] Game resumed');
     if (this.pauseStartTime > 0) {
+      // Add pause duration to start times to keep timers accurate
+      const pauseDuration = performance.now() - this.pauseStartTime;
+      this.gameStartTime += pauseDuration;
+      this.levelStartTime += pauseDuration;
       this.pauseStartTime = 0;
     }
 
@@ -274,17 +306,27 @@ export class GameStateManager {
     this.stats.score = Math.max(0, this.stats.score);
     
     console.info(`[GameStateManager] Level Complete! Score: ${Math.floor(this.stats.score)}`);
-    console.info(`  Time Bonus: ${Math.floor(timeBonus)}, Crash Penalty: ${Math.floor(crashPenalty)}`);
+    console.info(`  Level Bonus: ${levelBonus}, Time Bonus: ${Math.floor(timeBonus)}, Crash Penalty: ${Math.floor(crashPenalty)}`);
 
     if (this.trafficSystem) {
       this.trafficSystem.pauseTraffic();
     }
   }
 
+  private onMenuEnter() {
+    console.log('[GameStateManager] Entered menu state');
+    // Reset any pending flags
+    this.isGameStarting = false;
+  }
+
   // Game control methods
   startGame() {
+    console.log('[GameStateManager] startGame called - Resetting and starting game');
     this.resetGameStats();
-    this.setState(GameState.PLAYING);
+    // Small delay to ensure systems are ready
+    setTimeout(() => {
+      this.setState(GameState.PLAYING);
+    }, 50);
   }
 
   pauseGame() {
@@ -295,17 +337,19 @@ export class GameStateManager {
 
   resumeGame() {
     if (this.currentState === GameState.PAUSED) {
-      this.setState(GameState.PLAYING);
       this.onGameResume();
+      this.setState(GameState.PLAYING);
     }
   }
 
   restartLevel() {
+    console.log('[GameStateManager] restartLevel called');
     this.resetLevelStats();
     this.setState(GameState.PLAYING);
   }
 
   resetGame() {
+    console.log('[GameStateManager] resetGame called - Returning to menu');
     this.resetGameStats();
     this.setLevel(1);
     this.setState(GameState.MENU);
@@ -313,11 +357,14 @@ export class GameStateManager {
 
   // Statistics management
   private resetLevelStats() {
+    console.log('[GameStateManager] Resetting level stats');
     this.stats.distance = 0;
     this.stats.time = 0;
     this.stats.crashes = 0;
+    this.stats.score = 0;
     this.wasCrashed = false;
     this.levelStartTime = performance.now();
+    this.isGameStarting = true;
 
     if (this.physicsSystem) {
       this.physicsSystem.reset();
@@ -325,6 +372,7 @@ export class GameStateManager {
   }
 
   private resetGameStats() {
+    console.log('[GameStateManager] Resetting all game stats');
     this.stats = {
       score: 0,
       distance: 0,
@@ -335,6 +383,7 @@ export class GameStateManager {
       lane: 1
     };
     this.wasCrashed = false;
+    this.isGameStarting = false;
 
     if (this.physicsSystem) {
       this.physicsSystem.reset();
@@ -342,6 +391,7 @@ export class GameStateManager {
 
     if (this.trafficSystem) {
       this.trafficSystem.clearTraffic();
+      this.trafficSystem.resumeTraffic(); // Reset traffic state
     }
   }
 
@@ -376,6 +426,7 @@ export class GameStateManager {
       this.setLevel(data.level);
       this.difficulty = data.difficulty;
       this.currentState = data.state;
+      console.log('[GameStateManager] Game loaded successfully');
       return true;
     } catch (error) {
       console.error('[GameStateManager] Failed to load game:', error);
