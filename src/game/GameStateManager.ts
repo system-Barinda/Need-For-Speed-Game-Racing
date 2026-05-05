@@ -3,7 +3,7 @@ import type { GameStats, LevelConfig } from './types';
 import { PhysicsSystem } from './PhysicsSystem';
 import { TrafficSystem } from './TrafficSystem';
 
-export  class GameStateManager {
+export class GameStateManager {
   private currentState: GameState = GameState.MENU;
   private difficulty: Difficulty = Difficulty.MEDIUM;
   private currentLevel: LevelConfig;
@@ -27,7 +27,6 @@ export  class GameStateManager {
   private gameStartTime = 0;
   private levelStartTime = 0;
   private pauseStartTime = 0;
-  private totalPauseTime = 0;
 
   // Level configurations
   private levels: LevelConfig[] = [
@@ -127,7 +126,7 @@ export  class GameStateManager {
       return true;
     }
 
-    return false; // No more levels
+    return false;
   }
 
   // Difficulty management
@@ -161,12 +160,15 @@ export  class GameStateManager {
       this.stats.speed = this.physicsSystem.getSpeed();
       this.stats.lane = this.physicsSystem.getCurrentLane();
 
-      // Track distance (simplified)
+      // Track distance
       this.stats.distance += Math.abs(this.stats.speed) * deltaTime;
 
-      // Check for crashes
-      if (this.physicsSystem.isCrashed()) {
+      // Check for crashes (count each crash only once)
+      if (this.physicsSystem.isCrashed() && !this.wasCrashed) {
         this.stats.crashes++;
+        this.wasCrashed = true;
+      } else if (!this.physicsSystem.isCrashed()) {
+        this.wasCrashed = false;
       }
     }
 
@@ -177,18 +179,25 @@ export  class GameStateManager {
     this.checkGameConditions();
   }
 
+  private wasCrashed = false;
+
   private updateScore(deltaTime: number) {
     // Base score from distance
     this.stats.score += Math.abs(this.stats.speed) * deltaTime * 10;
 
-    // Bonus for speed
+    // Bonus for high speed
     if (this.stats.speed > 15) {
       this.stats.score += deltaTime * 20;
     }
 
+    // Bonus for perfect driving (no crashes)
+    if (this.stats.crashes === 0 && this.stats.distance > 500) {
+      this.stats.score += deltaTime * 5;
+    }
+
     // Penalty for crashes
     if (this.physicsSystem?.isCrashed()) {
-      this.stats.score = Math.max(0, this.stats.score - 100);
+      this.stats.score = Math.max(0, this.stats.score - deltaTime * 50);
     }
   }
 
@@ -216,7 +225,6 @@ export  class GameStateManager {
   private onGameStart() {
     this.gameStartTime = performance.now();
     this.levelStartTime = performance.now();
-    this.totalPauseTime = 0;
 
     // Apply level settings
     if (this.physicsSystem) {
@@ -240,7 +248,6 @@ export  class GameStateManager {
 
   private onGameResume() {
     if (this.pauseStartTime > 0) {
-      this.totalPauseTime += performance.now() - this.pauseStartTime;
       this.pauseStartTime = 0;
     }
 
@@ -258,7 +265,16 @@ export  class GameStateManager {
   }
 
   private onLevelComplete() {
+    // Bonus score for completing level
+    const timeBonus = Math.max(0, (this.currentLevel.timeLimit || 300) - this.stats.time) * 10;
+    const crashPenalty = this.stats.crashes * 200;
+    const levelBonus = 1000;
+    
+    this.stats.score += levelBonus + timeBonus - crashPenalty;
+    this.stats.score = Math.max(0, this.stats.score);
+    
     console.info(`[GameStateManager] Level Complete! Score: ${Math.floor(this.stats.score)}`);
+    console.info(`  Time Bonus: ${Math.floor(timeBonus)}, Crash Penalty: ${Math.floor(crashPenalty)}`);
 
     if (this.trafficSystem) {
       this.trafficSystem.pauseTraffic();
@@ -300,6 +316,7 @@ export  class GameStateManager {
     this.stats.distance = 0;
     this.stats.time = 0;
     this.stats.crashes = 0;
+    this.wasCrashed = false;
     this.levelStartTime = performance.now();
 
     if (this.physicsSystem) {
@@ -317,6 +334,7 @@ export  class GameStateManager {
       speed: 0,
       lane: 1
     };
+    this.wasCrashed = false;
 
     if (this.physicsSystem) {
       this.physicsSystem.reset();
@@ -331,7 +349,16 @@ export  class GameStateManager {
     return { ...this.stats };
   }
 
-  // Save/Load functionality (for future expansion)
+  getLevelProgress(): number {
+    return (this.stats.distance / this.currentLevel.targetDistance) * 100;
+  }
+
+  getTimeRemaining(): number {
+    if (!this.currentLevel.timeLimit) return -1;
+    return Math.max(0, this.currentLevel.timeLimit - this.stats.time);
+  }
+
+  // Save/Load functionality
   saveGame(): string {
     const saveData = {
       stats: this.stats,
@@ -356,20 +383,28 @@ export  class GameStateManager {
     }
   }
 
-  // Achievement system (basic)
+  // Achievement system
   checkAchievements(): string[] {
     const achievements: string[] = [];
 
-    if (this.stats.distance > 5000) {
-      achievements.push('Long Distance Driver');
+    if (this.stats.distance >= 5000) {
+      achievements.push('🏆 Long Distance Driver');
     }
 
-    if (this.stats.crashes === 0 && this.stats.distance > 1000) {
-      achievements.push('Perfect Driver');
+    if (this.stats.crashes === 0 && this.stats.distance >= 1000) {
+      achievements.push('🌟 Perfect Driver');
     }
 
-    if (this.stats.speed > 25) {
-      achievements.push('Speed Demon');
+    if (this.stats.speed >= 25) {
+      achievements.push('⚡ Speed Demon');
+    }
+
+    if (this.stats.score >= 10000) {
+      achievements.push('💰 High Roller');
+    }
+
+    if (this.currentLevel.id >= 4 && this.stats.crashes < 3) {
+      achievements.push('👑 Master Racer');
     }
 
     return achievements;
@@ -382,11 +417,9 @@ export  class GameStateManager {
       level: this.currentLevel.name,
       difficulty: this.difficulty,
       stats: this.stats,
-      levelProgress: (this.stats.distance / this.currentLevel.targetDistance * 100).toFixed(1) + '%',
-      timeRemaining: this.currentLevel.timeLimit ?
-        Math.max(0, this.currentLevel.timeLimit - this.stats.time).toFixed(1) + 's' : '∞',
-      gameStartTime: this.gameStartTime ? `${((performance.now() - this.gameStartTime) / 1000).toFixed(1)}s` : 'not started',
-      levelStartTime: this.levelStartTime ? new Date(this.levelStartTime).toISOString() : 'not started'
+      levelProgress: this.getLevelProgress().toFixed(1) + '%',
+      timeRemaining: this.getTimeRemaining() === -1 ? '∞' : this.getTimeRemaining().toFixed(1) + 's',
+      gameTime: this.gameStartTime ? `${((performance.now() - this.gameStartTime) / 1000).toFixed(1)}s` : 'not started'
     };
   }
 }
