@@ -5,8 +5,10 @@ export class PhysicsSystem {
   private car: THREE.Object3D;
   private input: InputHandler;
   private obstacles: THREE.Mesh[];
+  private curve: THREE.CatmullRomCurve3;
 
   // Physics properties
+  private t = 0; // Position along curve (0-1)
   private speed = 0;
   private velocity = new THREE.Vector3();
   private acceleration = new THREE.Vector3();
@@ -20,11 +22,12 @@ export class PhysicsSystem {
   private readonly LANE_WIDTH = 3.5;
   private lanes = [
     -this.LANE_WIDTH, // left
-    0,                // middle
-    this.LANE_WIDTH   // right
+    0, // middle
+    this.LANE_WIDTH, // right
   ];
   private currentLane = 1;
-  private targetX = this.lanes[this.currentLane];
+  private targetLane = 1;
+  private laneOffset = 0;
   private laneChangeSpeed = 8;
 
   // Collision system
@@ -47,17 +50,19 @@ export class PhysicsSystem {
   constructor(
     car: THREE.Object3D,
     obstacles: THREE.Mesh[],
-    input: InputHandler
+    input: InputHandler,
+    curve: THREE.CatmullRomCurve3
   ) {
     this.car = car;
     this.obstacles = obstacles;
     this.input = input;
+    this.curve = curve;
 
-    // Initialize car position
-    this.car.position.x = this.targetX;
+    // Initialize car position on curve
+    this.updateCarPosition();
     this.car.position.y = 0.35;
 
-    console.info('[PhysicsSystem] Initialized with car physics');
+    console.info('[PhysicsSystem] Initialized with curve-based physics');
   }
 
   update(deltaTime: number) {
@@ -79,6 +84,9 @@ export class PhysicsSystem {
     // Update crash recovery
     this.updateCrashRecovery(deltaTime);
 
+    // Update car position and rotation
+    this.updateCarPosition();
+
     // Update visual feedback
     this.updateVisualFeedback();
   }
@@ -95,7 +103,8 @@ export class PhysicsSystem {
         const accel = this.speed < 0 ? this.brakeRate : this.accelerationRate;
         this.speed += accel * deltaTime;
       } else if (isBackward) {
-        const accel = this.speed > 0 ? this.brakeRate : this.accelerationRate * 0.8;
+        const accel =
+          this.speed > 0 ? this.brakeRate : this.accelerationRate * 0.8;
         this.speed -= accel * deltaTime;
       } else {
         // Apply friction
@@ -107,7 +116,11 @@ export class PhysicsSystem {
     }
 
     // Clamp speed
-    this.speed = THREE.MathUtils.clamp(this.speed, -this.maxReverseSpeed, this.maxSpeed);
+    this.speed = THREE.MathUtils.clamp(
+      this.speed,
+      -this.maxReverseSpeed,
+      this.maxSpeed
+    );
 
     // Stop if very slow
     if (Math.abs(this.speed) < 0.05) {
@@ -118,35 +131,42 @@ export class PhysicsSystem {
     if (this.laneCooldown <= 0) {
       if (isLeft && this.currentLane > 0) {
         this.currentLane--;
-        this.targetX = this.lanes[this.currentLane];
+        this.targetLane = this.currentLane;
         this.laneCooldown = this.LANE_COOLDOWN_TIME;
       } else if (isRight && this.currentLane < this.lanes.length - 1) {
         this.currentLane++;
-        this.targetX = this.lanes[this.currentLane];
+        this.targetLane = this.currentLane;
         this.laneCooldown = this.LANE_COOLDOWN_TIME;
       }
     }
   }
 
   private updatePhysics(deltaTime: number) {
-    // Update velocity based on speed (assuming forward is -Z)
-    this.velocity.set(0, 0, -this.speed);
+    // Update position along curve based on speed
+    // Speed is in units per second, convert to t change
+    const curveLength = this.curve.getLength();
+    const tChange = (this.speed * deltaTime) / curveLength;
+    this.t += tChange;
 
-    // Apply velocity to position
-    this.car.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+    // Keep t in valid range (loop the track)
+    if (this.t > 1) {
+      this.t = this.t - 1;
+    } else if (this.t < 0) {
+      this.t = 1 + this.t;
+    }
   }
 
   private updateLaneChange(deltaTime: number) {
     // Smooth lane transitions
-    const currentX = this.car.position.x;
-    const diff = this.targetX - currentX;
+    const targetOffset = this.lanes[this.targetLane];
+    const diff = targetOffset - this.laneOffset;
 
     if (Math.abs(diff) > 0.01) {
       const moveAmount = Math.sign(diff) * this.laneChangeSpeed * deltaTime;
       if (Math.abs(moveAmount) > Math.abs(diff)) {
-        this.car.position.x = this.targetX;
+        this.laneOffset = targetOffset;
       } else {
-        this.car.position.x += moveAmount;
+        this.laneOffset += moveAmount;
       }
     }
   }
@@ -182,15 +202,24 @@ export class PhysicsSystem {
     }
   }
 
-  private updateVisualFeedback() {
-    // Calculate tilt based on lane change
-    const tiltTarget = (this.targetX - this.car.position.x) * this.MAX_TILT;
-    this.tiltAngle = THREE.MathUtils.lerp(this.tiltAngle, tiltTarget, 0.15);
+  private updateCarPosition() {
+    // Get curve frame at current t
+    const point = this.curve.getPoint(this.t);
+    const tangent = this.curve.getTangent(this.t).normalize();
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-    // Apply rotations
-    this.car.rotation.z = -this.tiltAngle;
-    this.car.rotation.y = 0;
-    this.car.rotation.x = 0;
+    // Calculate position with lane offset
+    const position = point
+      .clone()
+      .add(normal.clone().multiplyScalar(this.laneOffset));
+    position.y = 0.35;
+
+    // Update car position
+    this.car.position.copy(position);
+
+    // Orient car along curve (forward direction)
+    const lookTarget = position.clone().add(tangent);
+    this.car.lookAt(lookTarget);
   }
 
   // Public getters for game state
@@ -247,11 +276,11 @@ export class PhysicsSystem {
       position: {
         x: this.car.position.x.toFixed(2),
         y: this.car.position.y.toFixed(2),
-        z: this.car.position.z.toFixed(2)
+        z: this.car.position.z.toFixed(2),
       },
       crashed: this.crashed,
       crashTimer: this.crashTimer.toFixed(2),
-      laneCooldown: this.laneCooldown.toFixed(2)
+      laneCooldown: this.laneCooldown.toFixed(2),
     };
   }
 }
