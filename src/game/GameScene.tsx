@@ -49,6 +49,9 @@ export default function GameScene() {
     gameStateManager.setPhysicsSystem(controller.physicsSystem);
     gameStateManager.setTrafficSystem(trafficSystem);
 
+    // Initial UI update to show menu
+    uiSystem.update(0);
+
     // ── CAMERA HELPERS (REUSED OBJECTS) ─
     const camPos = new THREE.Vector3();
     const camTarget = new THREE.Vector3();
@@ -76,6 +79,9 @@ export default function GameScene() {
       gameStateManager.update(safeDelta);
       controller.update(safeDelta);
       updateTraffic?.(safeDelta, car.position);
+
+      // Update input
+      input.update();
 
       // Update UI
       uiSystem.update(safeDelta);
@@ -124,6 +130,7 @@ export default function GameScene() {
         overflow: 'hidden',
         margin: 0,
         padding: 0,
+        position: 'relative',
       }}
     />
   );
