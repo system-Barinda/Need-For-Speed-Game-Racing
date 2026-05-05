@@ -41,7 +41,7 @@ export default function GameScene() {
 
     // ── SYSTEMS INITIALIZATION ─────────
     const input = new InputHandler();
-    const controller = new GameController(car, obstacles, input);
+    const controller = new GameController(car, obstacles, input, curve);
     const gameStateManager = new GameStateManager();
     const uiSystem = new UISystem(mountRef.current, gameStateManager);
 

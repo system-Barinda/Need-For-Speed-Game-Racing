@@ -222,6 +222,15 @@ export class PhysicsSystem {
     this.car.lookAt(lookTarget);
   }
 
+  private updateVisualFeedback() {
+    // Calculate tilt based on lane change
+    const tiltTarget = (this.lanes[this.targetLane] - this.laneOffset) * this.MAX_TILT;
+    this.tiltAngle = THREE.MathUtils.lerp(this.tiltAngle, tiltTarget, 0.15);
+
+    // Apply tilt rotation (z-axis) while preserving the curve orientation
+    this.car.rotation.z = -this.tiltAngle;
+  }
+
   // Public getters for game state
   getSpeed(): number {
     return this.speed;
@@ -244,14 +253,16 @@ export class PhysicsSystem {
     this.speed = 0;
     this.velocity.set(0, 0, 0);
     this.acceleration.set(0, 0, 0);
+    this.t = 0;
     this.currentLane = 1;
-    this.targetX = this.lanes[this.currentLane];
-    this.car.position.x = this.targetX;
+    this.targetLane = 1;
+    this.laneOffset = 0;
     this.crashed = false;
     this.crashTimer = 0;
     this.spawnSafeTime = 0;
     this.laneCooldown = 0;
     this.tiltAngle = 0;
+    this.updateCarPosition();
     console.info('[PhysicsSystem] Physics reset');
   }
 

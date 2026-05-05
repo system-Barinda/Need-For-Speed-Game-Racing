@@ -10,9 +10,10 @@ export class GameController {
   constructor(
     car: THREE.Object3D,
     obstacles: THREE.Mesh[],
-    input: InputHandler
+    input: InputHandler,
+    curve: THREE.CatmullRomCurve3
   ) {
-    this.physicsSystem = new PhysicsSystem(car, obstacles, input);
+    this.physicsSystem = new PhysicsSystem(car, obstacles, input, curve);
     console.info('[GameController] Legacy controller initialized with PhysicsSystem');
   }
 
