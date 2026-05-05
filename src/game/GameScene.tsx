@@ -18,6 +18,7 @@ export default function GameScene() {
       camera,
       renderer,
       car,
+      curve,
       obstacles,
       trafficSystem,
       updateTraffic,
@@ -26,8 +27,10 @@ export default function GameScene() {
 
     // ── SET SIZE (BASED ON CONTAINER) ──
     const setSize = () => {
-      const width = mountRef.current!.clientWidth;
-      const height = mountRef.current!.clientHeight;
+      if (!mountRef.current) return;
+
+      const width = mountRef.current.clientWidth;
+      const height = mountRef.current.clientHeight;
 
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));

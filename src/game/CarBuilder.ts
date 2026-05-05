@@ -128,9 +128,9 @@ export const createCar = (scene: THREE.Scene) => {
     tires.push(tire);
   });
 
-  // ================= LANE SYSTEM (FIX) =================
+  // ================= LANE SYSTEM =================
   const lanes = [-2, 0, 2]; // MUST match your road
-  let currentLane = 1;
+  let currentLane = 1; // Start in middle lane (index 1 = x:0)
   let targetX = lanes[currentLane];
 
   const moveLeft = () => {
@@ -140,6 +140,11 @@ export const createCar = (scene: THREE.Scene) => {
 
   const moveRight = () => {
     currentLane = Math.min(lanes.length - 1, currentLane + 1);
+    targetX = lanes[currentLane];
+  };
+
+  const moveToLane = (laneIndex: number) => {
+    currentLane = Math.max(0, Math.min(lanes.length - 1, laneIndex));
     targetX = lanes[currentLane];
   };
 
@@ -154,10 +159,13 @@ export const createCar = (scene: THREE.Scene) => {
   return {
     car,
     tires,
-
-    // 🔥 IMPORTANT (used in GameController)
+    // Lane control methods
     moveLeft,
     moveRight,
+    moveToLane,
     update,
+    // Optional helpers
+    getCurrentLane: () => currentLane,
+    getLanes: () => lanes,
   };
 };
