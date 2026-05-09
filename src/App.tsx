@@ -20,7 +20,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     if (this.state.hasError) {
       return (
         <div style={styles.errorContainer}>
-          <h1 style={styles.errorTitle}>⚠️ Game Error</h1>
+          <h1 style={styles.errorTitle}> Game Error</h1>
           <p style={styles.errorMessage}>Something went wrong with the game.</p>
           <details style={styles.errorDetails}>
             <summary>Error Details</summary>
@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            🔄 Reload Game
+             Reload Game
           </button>
         </div>
       );
@@ -63,10 +63,10 @@ const LoadingScreen: React.FC = () => {
         }
         
         // Update loading message based on progress
-        if (prev < 20) setMessage('🚀 Initializing engine...');
-        else if (prev < 40) setMessage('🛣️ Loading road system...');
-        else if (prev < 60) setMessage('🚗 Spawning vehicles...');
-        else if (prev < 80) setMessage('🎨 Loading textures...');
+        if (prev < 20) setMessage(' Initializing engine...');
+        else if (prev < 40) setMessage(' Loading road system...');
+        else if (prev < 60) setMessage(' Spawning vehicles...');
+        else if (prev < 80) setMessage(' Loading textures...');
         else setMessage('✨ Almost ready...');
         
         return prev + 5;
@@ -80,7 +80,7 @@ const LoadingScreen: React.FC = () => {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.loadingContent}>
-          <h1 style={styles.loadingTitle}>🏎️ NEED FOR SPEED RACING 🏎️</h1>
+          <h1 style={styles.loadingTitle}> NEED FOR SPEED RACING </h1>
           <div style={styles.loadingBarContainer}>
             <div style={{ ...styles.loadingBar, width: `${progress}%` }} />
           </div>
