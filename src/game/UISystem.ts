@@ -431,24 +431,30 @@ export class UISystem {
     // Hide all menus first
     this.hideAllMenus();
 
-    // Show HUD based on state and settings
-    this.hudContainer.style.display = (this.showHUD && state === 'playing') ? 'block' : 'none';
+    // Show HUD based on state and settings - with higher z-index when playing
+    const isPlaying = state === 'playing';
+    this.hudContainer.style.display = (this.showHUD && isPlaying) ? 'block' : 'none';
+    this.hudContainer.style.zIndex = isPlaying ? '1000' : '150';
 
     // Show appropriate menu
     switch (state) {
       case 'menu':
         this.mainMenu.style.display = 'block';
+        this.mainMenu.style.zIndex = '200';
         break;
       case 'paused':
         this.pauseMenu.style.display = 'block';
+        this.pauseMenu.style.zIndex = '200';
         break;
       case 'game_over':
         this.updateGameOverStats();
         this.gameOverMenu.style.display = 'block';
+        this.gameOverMenu.style.zIndex = '200';
         break;
       case 'level_complete':
         this.updateLevelCompleteStats();
         this.levelCompleteMenu.style.display = 'block';
+        this.levelCompleteMenu.style.zIndex = '200';
         break;
     }
   }

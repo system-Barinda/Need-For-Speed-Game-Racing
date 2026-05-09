@@ -42,79 +42,88 @@ export const createCar = (scene: THREE.Scene) => {
 
   // ================= MAIN BODY =================
 
-  // Lower body
+  // Main chassis/base
   const base = new THREE.Mesh(
-    new THREE.BoxGeometry(2.0, 0.45, 4.5),
+    new THREE.BoxGeometry(1.95, 0.35, 4.8),
     bodyMat
   );
-  base.position.y = 0.35;
+  base.position.y = 0.3;
   base.castShadow = true;
   base.receiveShadow = true;
   car.add(base);
 
-  // Upper body
-  const upperBody = new THREE.Mesh(
-    new THREE.BoxGeometry(1.85, 0.4, 3.3),
-    bodyMat
-  );
-  upperBody.position.set(0, 0.72, -0.15);
-  upperBody.castShadow = true;
-  car.add(upperBody);
-
-  // Roof
-  const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.28, 1.8),
-    bodyMat
-  );
-  roof.position.set(0, 1.08, -0.25);
-  roof.castShadow = true;
-  car.add(roof);
-
-  // Front hood slope
+  // Front hood - longer and sloped
   const hood = new THREE.Mesh(
-    new THREE.BoxGeometry(1.75, 0.18, 1.1),
+    new THREE.BoxGeometry(1.8, 0.22, 1.5),
     bodyMat
   );
-  hood.position.set(0, 0.62, 1.55);
-  hood.rotation.x = -0.12;
+  hood.position.set(0, 0.45, 1.7);
+  hood.rotation.x = -0.15;
   hood.castShadow = true;
   car.add(hood);
 
-  // Rear slope
-  const rearSlope = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, 0.2, 0.9),
+  // Upper cabin
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(1.75, 0.45, 2.2),
     bodyMat
   );
-  rearSlope.position.set(0, 0.65, -1.85);
-  rearSlope.rotation.x = 0.18;
-  rearSlope.castShadow = true;
-  car.add(rearSlope);
+  cabin.position.set(0, 0.75, -0.1);
+  cabin.castShadow = true;
+  car.add(cabin);
+
+  // Roof - tapered sides for racing style
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 0.25, 1.9),
+    bodyMat
+  );
+  roof.position.set(0, 1.08, -0.15);
+  roof.castShadow = true;
+  car.add(roof);
+
+  // Rear deck/trunk - sloped down
+  const trunk = new THREE.Mesh(
+    new THREE.BoxGeometry(1.75, 0.22, 0.95),
+    bodyMat
+  );
+  trunk.position.set(0, 0.52, -1.95);
+  trunk.rotation.x = 0.12;
+  trunk.castShadow = true;
+  car.add(trunk);
+
+  // Front bumper - more prominent
+  const frontBumper = new THREE.Mesh(
+    new THREE.BoxGeometry(2.05, 0.15, 0.25),
+    bodyMat
+  );
+  frontBumper.position.set(0, 0.25, 2.45);
+  frontBumper.castShadow = true;
+  car.add(frontBumper);
 
   // ================= WINDOWS =================
 
   const windshield = new THREE.Mesh(
-    new THREE.BoxGeometry(1.42, 0.45, 0.05),
+    new THREE.BoxGeometry(1.45, 0.5, 0.08),
     glassMat
   );
-  windshield.position.set(0, 0.98, 0.6);
-  windshield.rotation.x = -0.65;
+  windshield.position.set(0, 1.0, 0.55);
+  windshield.rotation.x = -0.7;
   car.add(windshield);
 
   const rearGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(1.38, 0.38, 0.05),
+    new THREE.BoxGeometry(1.35, 0.42, 0.08),
     glassMat
   );
-  rearGlass.position.set(0, 0.95, -1.1);
-  rearGlass.rotation.x = 0.55;
+  rearGlass.position.set(0, 0.98, -1.3);
+  rearGlass.rotation.x = 0.6;
   car.add(rearGlass);
 
-  [-0.78, 0.78].forEach((x) => {
+  [-0.88, 0.88].forEach((x) => {
     const sideWindow = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.38, 1.4),
+      new THREE.BoxGeometry(0.08, 0.42, 1.6),
       glassMat
     );
 
-    sideWindow.position.set(x, 0.95, -0.2);
+    sideWindow.position.set(x, 0.98, -0.1);
     car.add(sideWindow);
   });
 
@@ -162,14 +171,15 @@ export const createCar = (scene: THREE.Scene) => {
 
   const tires: THREE.Mesh[] = [];
 
-  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 32);
-  const rimGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.44, 24);
+  // Larger wheels with proper proportions
+  const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.32, 32);
+  const rimGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.35, 24);
 
   const wheelPositions: [number, number][] = [
-    [-1.02, 1.45],
-    [1.02, 1.45],
-    [-1.02, -1.45],
-    [1.02, -1.45],
+    [-1.15, 1.3],   // Front left
+    [1.15, 1.3],    // Front right
+    [-1.15, -1.55], // Rear left
+    [1.15, -1.55],  // Rear right
   ];
 
   wheelPositions.forEach(([x, z]) => {
@@ -182,20 +192,30 @@ export const createCar = (scene: THREE.Scene) => {
 
     const rim = new THREE.Mesh(rimGeo, rimMat);
     rim.rotation.z = Math.PI / 2;
+    rim.castShadow = true;
 
-    // Rim ring
+    // Rim ring - larger and more visible
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(0.22, 0.03, 12, 32),
+      new THREE.TorusGeometry(0.28, 0.04, 16, 100),
       rimMat
     );
 
     ring.rotation.y = Math.PI / 2;
+    ring.castShadow = true;
+
+    // Inner rim details
+    const innerRim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.25, 0.36, 24),
+      new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7, roughness: 0.3 })
+    );
+    innerRim.rotation.z = Math.PI / 2;
 
     wheelGroup.add(tire);
     wheelGroup.add(rim);
     wheelGroup.add(ring);
+    wheelGroup.add(innerRim);
 
-    wheelGroup.position.set(x, 0.38, z);
+    wheelGroup.position.set(x, 0.3, z);
 
     car.add(wheelGroup);
 
