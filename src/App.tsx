@@ -1,7 +1,7 @@
 import React from 'react';
 import GameScene from './game/GameScene';
 
-// Error boundary component for catching game errors
+
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: Error }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -67,7 +67,7 @@ const LoadingScreen: React.FC = () => {
         else if (prev < 40) setMessage(' Loading road system...');
         else if (prev < 60) setMessage(' Spawning vehicles...');
         else if (prev < 80) setMessage(' Loading textures...');
-        else setMessage('✨ Almost ready...');
+        else setMessage(' Almost ready...');
         
         return prev + 5;
       });
